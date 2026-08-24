@@ -1,7 +1,7 @@
 const DEFAULT_REFERENDA_PATH = "gov2/referendums";
 const COLLECTIVES_REFERENDA_PATH = "fellowship/referenda";
 
-export const supportedChains = ["polkadot", "collectives", "hydration"];
+export const supportedChains = ["polkadot", "collectives", "hydration", "kusama"];
 
 function requireEnv(name) {
   const value = process.env[name]?.trim();

@@ -1,7 +1,14 @@
 import isNil from "lodash/isNil.js";
 import omitBy from "lodash/omitBy.js";
+import { ProxyAgent, fetch } from "undici";
 
 const API_REQUEST_TIMEOUT_MS = 10_000;
+const proxyUrl = process.env.HTTP_PROXY?.trim();
+let dispatcher;
+
+if (proxyUrl) {
+  dispatcher = new ProxyAgent(proxyUrl);
+}
 
 function addQueryParams(url, query) {
   const requestUrl = new URL(url);
@@ -17,6 +24,7 @@ export async function fetchJson(url, query = {}) {
       accept: "application/json",
     },
     signal: AbortSignal.timeout(API_REQUEST_TIMEOUT_MS),
+    dispatcher,
   });
 
   if (response.ok) {
