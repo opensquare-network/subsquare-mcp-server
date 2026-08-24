@@ -10,7 +10,8 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "start": "node --env-file-if-exists=.env src/index.js"
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "inspect": "mcp-inspector --web --transport http --server-url ${MCP_SERVER_URL:-http://127.0.0.1:3210/mcp}"
   },
   "dependencies": {
     "@koa/router": "^15.7.0",
