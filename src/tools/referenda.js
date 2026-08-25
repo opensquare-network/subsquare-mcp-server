@@ -66,7 +66,8 @@ export function registerReferendaTools(server) {
   server.registerTool(
     "gov2_list_referenda",
     {
-      description: `List Gov2 referenda for a configured chain through its SubSquare HTTP API. Returns referenda, total count, and pagination information.`,
+      description:
+        "Find and browse Gov2 referenda on a configured SubSquare chain. Use it to inspect referendum details, filter by status or Treasury relevance, and retrieve paginated results.",
       inputSchema: referendaListInputSchema,
       annotations: readOnlyAnnotations,
     },
@@ -79,7 +80,8 @@ export function registerReferendaTools(server) {
   server.registerTool(
     "gov2_referenda_summary",
     {
-      description: `Get the Gov2 referenda summary for a configured chain through its SubSquare HTTP API.`,
+      description:
+        "Summarize Gov2 referendum activity on a configured SubSquare chain. Use it for aggregate counts and a quick overview before listing individual referenda.",
       inputSchema: { chain },
       annotations: readOnlyAnnotations,
     },
