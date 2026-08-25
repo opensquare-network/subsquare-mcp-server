@@ -32,3 +32,26 @@ export async function fetchJson(url, query = {}) {
     `SubSquare API request failed with status ${response.status}: ${message}`,
   );
 }
+
+export async function postJson(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(API_REQUEST_TIMEOUT_MS),
+    dispatcher,
+  });
+
+  if (response.ok) {
+    return response.json();
+  }
+
+  const message =
+    (await response.text()).trim() || response.statusText || "Unknown error";
+  throw new Error(
+    `SubSquare API request failed with status ${response.status}: ${message}`,
+  );
+}

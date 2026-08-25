@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  getTreasuryBalances,
   getTreasuryStatus,
   listTreasuryProjects,
 } from "../services/treasury.js";
@@ -29,6 +30,16 @@ const treasuryProjectsInputSchema = {
 
 const treasuryStatusInputSchema = { chain: treasuryChain };
 
+const treasuryBalancesInputSchema = {
+  chain: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Optional exact chain identifier, for example 'polkadot'. Omit to return every supported chain.",
+    ),
+};
+
 export function registerTreasuryTools(server) {
   server.registerTool(
     "treasury_list_projects",
@@ -54,6 +65,20 @@ export function registerTreasuryTools(server) {
     },
     async (args) => {
       const result = await getTreasuryStatus(args);
+      return createJsonResult(result);
+    },
+  );
+
+  server.registerTool(
+    "treasury_get_balances",
+    {
+      description:
+        "Get current treasury balances from DotTreasury for every reported chain, or one exact chain. Asset balances in balances are raw decimal strings in each asset's smallest unit; use their decimals before display. The chain-level balance is returned as provided by DotTreasury. Includes chain and asset prices plus their update timestamps.",
+      inputSchema: treasuryBalancesInputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async (args) => {
+      const result = await getTreasuryBalances(args);
       return createJsonResult(result);
     },
   );
