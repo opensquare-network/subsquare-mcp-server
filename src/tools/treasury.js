@@ -1,6 +1,9 @@
 import { z } from "zod";
 import {
+  dotTreasuryChains,
   getTreasuryBalances,
+} from "../services/dotreasury.js";
+import {
   getTreasuryStatus,
   listTreasuryProjects,
 } from "../services/treasury.js";
@@ -32,11 +35,10 @@ const treasuryStatusInputSchema = { chain: treasuryChain };
 
 const treasuryBalancesInputSchema = {
   chain: z
-    .string()
-    .trim()
+    .enum(dotTreasuryChains)
     .optional()
     .describe(
-      "Optional exact chain identifier, for example 'polkadot'. Omit to return every supported chain.",
+      "Optional DotTreasury chain. Omit to return every reported chain.",
     ),
 };
 

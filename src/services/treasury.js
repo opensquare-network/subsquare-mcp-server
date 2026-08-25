@@ -1,27 +1,8 @@
 import { getChainConfig } from "../config/chains.js";
-import { fetchJson, postJson } from "./api.js";
+import { fetchJson } from "./api.js";
 
 const PROJECTS_API_PATH = "treasury/status/projects";
 const TREASURY_SUMMARY_API_PATH = "overview/summary";
-const DOT_TREASURY_OPERATION_NAME = "GetTreasuries";
-const DOT_TREASURY_QUERY = `
-  query GetTreasuries {
-    treasuries {
-      balance
-      balanceUpdateAt
-      chain
-      price
-      priceUpdateAt
-      balances {
-        balance
-        decimals
-        price
-        priceUpdateAt
-        token
-      }
-    }
-  }
-`;
 
 function getTreasuryEndpoints(chain) {
   const { apiUrl } = getChainConfig(chain);
@@ -75,25 +56,4 @@ export async function getTreasuryStatus({ chain } = {}) {
     multiAssetBounties: summary.multiAssetBounties,
     multiAssetChildBounties: summary.multiAssetChildBounties,
   };
-}
-
-export async function getTreasuryBalances({ chain } = {}) {
-  const response = await postJson(process.env.DOT_TREASURY_GRAPHQL_URL, {
-    operationName: DOT_TREASURY_OPERATION_NAME,
-    variables: {},
-    query: DOT_TREASURY_QUERY,
-  });
-
-  const treasuries = response.data?.treasuries;
-  if (!Array.isArray(treasuries)) {
-    throw new Error(
-      "DotTreasury GraphQL response did not include treasury balances",
-    );
-  }
-
-  if (chain) {
-    return treasuries.filter((treasury) => treasury.chain === chain);
-  }
-
-  return treasuries;
 }
