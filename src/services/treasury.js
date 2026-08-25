@@ -8,16 +8,15 @@ function getTreasuryEndpoints(chain) {
   const { apiUrl } = getChainConfig(chain);
 
   return {
-    beneficiariesUrl: new URL("treasury/beneficiaries", apiUrl),
     projectsUrl: new URL(PROJECTS_API_PATH, apiUrl),
     summaryUrl: new URL(TREASURY_SUMMARY_API_PATH, apiUrl),
   };
 }
 
 export async function listTreasuryProjects({
-  page = 1,
-  page_size = 10,
   project_id,
+  page_size = 10,
+  include_all = false,
 } = {}) {
   const { projectsUrl } = getTreasuryEndpoints("polkadot");
   const projects = await fetchJson(projectsUrl);
@@ -28,26 +27,15 @@ export async function listTreasuryProjects({
     );
   }
 
-  const filteredProjects = projects.filter(
-    ({ id }) => !project_id || id === project_id,
-  );
-  const offset = (page - 1) * page_size;
+  if (project_id) {
+    return projects.filter(({ id }) => id === project_id);
+  }
 
-  return {
-    items: filteredProjects.slice(offset, offset + page_size),
-    page,
-    pageSize: page_size,
-    total: filteredProjects.length,
-  };
-}
+  if (include_all) {
+    return projects;
+  }
 
-export async function listTreasuryBeneficiaries({
-  chain,
-  page,
-  page_size,
-} = {}) {
-  const { beneficiariesUrl } = getTreasuryEndpoints(chain);
-  return fetchJson(beneficiariesUrl, { page, page_size });
+  return projects.slice(0, page_size);
 }
 
 export async function getTreasuryStatus({ chain } = {}) {

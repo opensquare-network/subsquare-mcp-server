@@ -1,15 +1,9 @@
 import { z } from "zod";
 import {
   getTreasuryStatus,
-  listTreasuryBeneficiaries,
   listTreasuryProjects,
 } from "../services/treasury.js";
-import {
-  createJsonResult,
-  page,
-  pageSize,
-  readOnlyAnnotations,
-} from "./common.js";
+import { createJsonResult, pageSize, readOnlyAnnotations } from "./common.js";
 
 const treasuryChains = ["polkadot", "kusama"];
 
@@ -25,24 +19,22 @@ const treasuryChain = z
   .describe("Treasury chain to query: polkadot or kusama");
 
 const treasuryProjectsInputSchema = {
-  page,
-  page_size: pageSize,
   project_id: projectId.optional(),
+  page_size: pageSize,
+  include_all: z
+    .boolean()
+    .optional()
+    .describe("Set to true only when every project is required"),
 };
 
 const treasuryStatusInputSchema = { chain: treasuryChain };
-const treasuryBeneficiariesInputSchema = {
-  chain: treasuryChain,
-  page,
-  page_size: pageSize,
-};
 
 export function registerTreasuryTools(server) {
   server.registerTool(
     "treasury_list_projects",
     {
       description:
-        "Find Polkadot Treasury-funded projects and inspect their funding, category, links, and related proposals, spends, bounties, child bounties, and tips. Returns paginated results and supports an exact project_id filter. Supports Polkadot only.",
+        "Find Polkadot Treasury-funded projects and inspect their funding, category, links, and related proposals, spends, bounties, child bounties, and tips. Returns up to page_size projects by default, supports an exact project_id filter, and returns every project only when include_all is true. Supports Polkadot only.",
       inputSchema: treasuryProjectsInputSchema,
       annotations: readOnlyAnnotations,
     },
@@ -62,20 +54,6 @@ export function registerTreasuryTools(server) {
     },
     async (args) => {
       const result = await getTreasuryStatus(args);
-      return createJsonResult(result);
-    },
-  );
-
-  server.registerTool(
-    "treasury_list_beneficiaries",
-    {
-      description:
-        "Find and compare Treasury beneficiary addresses on Polkadot or Kusama. Returns paginated classification tags and benefit counts and fiat values across proposals, spends, bounties, child bounties, and tips.",
-      inputSchema: treasuryBeneficiariesInputSchema,
-      annotations: readOnlyAnnotations,
-    },
-    async (args) => {
-      const result = await listTreasuryBeneficiaries(args);
       return createJsonResult(result);
     },
   );
