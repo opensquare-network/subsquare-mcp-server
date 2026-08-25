@@ -25,6 +25,8 @@ const treasuryChain = z
   .describe("Treasury chain to query: polkadot or kusama");
 
 const treasuryProjectsInputSchema = {
+  page,
+  page_size: pageSize,
   project_id: projectId.optional(),
 };
 
@@ -40,7 +42,7 @@ export function registerTreasuryTools(server) {
     "treasury_list_projects",
     {
       description:
-        "Find Polkadot Treasury-funded projects and inspect their funding, category, links, and related proposals, spends, bounties, child bounties, and tips. Returns all projects unless an exact project_id is provided. Supports Polkadot only.",
+        "Find Polkadot Treasury-funded projects and inspect their funding, category, links, and related proposals, spends, bounties, child bounties, and tips. Returns paginated results and supports an exact project_id filter. Supports Polkadot only.",
       inputSchema: treasuryProjectsInputSchema,
       annotations: readOnlyAnnotations,
     },

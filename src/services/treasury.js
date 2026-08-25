@@ -1,10 +1,11 @@
+import { getChainConfig } from "../config/chains.js";
 import { fetchJson } from "./api.js";
 
 const PROJECTS_API_PATH = "treasury/status/projects";
 const TREASURY_SUMMARY_API_PATH = "overview/summary";
 
 function getTreasuryEndpoints(chain) {
-  const apiUrl = `https://${chain}-api.subsquare.io`;
+  const { apiUrl } = getChainConfig(chain);
 
   return {
     beneficiariesUrl: new URL("treasury/beneficiaries", apiUrl),
@@ -13,7 +14,11 @@ function getTreasuryEndpoints(chain) {
   };
 }
 
-export async function listTreasuryProjects({ project_id } = {}) {
+export async function listTreasuryProjects({
+  page = 1,
+  page_size = 10,
+  project_id,
+} = {}) {
   const { projectsUrl } = getTreasuryEndpoints("polkadot");
   const projects = await fetchJson(projectsUrl);
 
@@ -23,7 +28,17 @@ export async function listTreasuryProjects({ project_id } = {}) {
     );
   }
 
-  return project_id ? projects.filter(({ id }) => id === project_id) : projects;
+  const filteredProjects = projects.filter(
+    ({ id }) => !project_id || id === project_id,
+  );
+  const offset = (page - 1) * page_size;
+
+  return {
+    items: filteredProjects.slice(offset, offset + page_size),
+    page,
+    pageSize: page_size,
+    total: filteredProjects.length,
+  };
 }
 
 export async function listTreasuryBeneficiaries({
