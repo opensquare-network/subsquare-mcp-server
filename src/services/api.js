@@ -12,15 +12,27 @@ function addQueryParams(url, query) {
   return requestUrl;
 }
 
-export async function fetchJson(url, query = {}) {
-  const response = await fetch(addQueryParams(url, query), {
-    method: "GET",
-    headers: {
-      accept: "application/json",
-    },
+async function requestJson(
+  url,
+  { method = "GET", query = {}, body } = {},
+) {
+  const hasBody = body !== undefined;
+  const headers = {
+    accept: "application/json",
+  };
+  const requestOptions = {
+    method,
+    headers,
     signal: AbortSignal.timeout(API_REQUEST_TIMEOUT_MS),
     dispatcher,
-  });
+  };
+
+  if (hasBody) {
+    headers["content-type"] = "application/json";
+    requestOptions.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(addQueryParams(url, query), requestOptions);
 
   if (response.ok) {
     return response.json();
@@ -32,3 +44,12 @@ export async function fetchJson(url, query = {}) {
     `SubSquare API request failed with status ${response.status}: ${message}`,
   );
 }
+
+export const request = {
+  get(url, query = {}) {
+    return requestJson(url, { query });
+  },
+  post(url, body) {
+    return requestJson(url, { method: "POST", body });
+  },
+};
