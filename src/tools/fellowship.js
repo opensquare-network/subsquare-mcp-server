@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { listFellowshipMembers } from "../services/fellowship.js";
-import { createJsonResult, readOnlyAnnotations } from "./common.js";
+import { readOnlyAnnotations } from "./common.js";
 
 const rankInfoSchema = z.object({
   activeSalary: z.string().nullable(),
@@ -60,7 +60,6 @@ export function registerFellowshipTools(server) {
     async () => {
       const result = await listFellowshipMembers();
       return {
-        ...createJsonResult(result),
         structuredContent: { members: result },
       };
     },
