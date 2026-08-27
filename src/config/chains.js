@@ -13,6 +13,22 @@ const identityChains = {
   [chains.kusama]: chains.kusama,
 };
 
+const chainApiEndpoints = {
+  [chains.polkadot]: "https://polkadot-api.subsquare.io",
+  [chains.kusama]: "https://kusama-api.subsquare.io",
+  [chains.collectives]: "https://collectives-api.subsquare.io",
+  [chains.hydration]: "https://hydration-api.subsquare.io",
+};
+
+function getApiUrlByChain(chain) {
+  const url = chainApiEndpoints[chain];
+  if (!url) {
+    throw new Error(`${chain} is not configured`);
+  }
+
+  return url;
+}
+
 function requireEnv(name) {
   const value = process.env[name]?.trim();
   if (!value) {
@@ -24,7 +40,7 @@ function requireEnv(name) {
 
 export function getChainConfig(chain) {
   return {
-    apiUrl: requireEnv(`SUBSQUARE_API_URL_${chain.toUpperCase()}`),
+    apiUrl: getApiUrlByChain(chain),
     referendaPath: isCollectivesChain(chain)
       ? COLLECTIVES_REFERENDA_PATH
       : DEFAULT_REFERENDA_PATH,
