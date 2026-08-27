@@ -1,5 +1,5 @@
+import { chains } from "../config/chain.js";
 import { getChainConfig } from "../config/chains.js";
-import { isCollectivesChain } from "../config/chain.js";
 import { request } from "./api.js";
 import { getIdentityMap } from "./identity.js";
 
@@ -26,13 +26,11 @@ function getMemberAddresses(members) {
     .map((member) => member.address);
 }
 
-export async function listFellowshipMembers({ chain } = {}) {
-  const { apiUrl } = getChainConfig(chain);
+export async function listFellowshipMembers() {
+  const { apiUrl } = getChainConfig(chains.collectives);
   const [members, coreParams] = await Promise.all([
     request.get(new URL(FELLOWSHIP_MEMBERS_PATH, apiUrl)),
-    isCollectivesChain(chain)
-      ? request.get(new URL(FELLOWSHIP_CORE_PARAMS_PATH, apiUrl))
-      : null,
+    request.get(new URL(FELLOWSHIP_CORE_PARAMS_PATH, apiUrl)),
   ]);
 
   if (!Array.isArray(members)) {
@@ -42,7 +40,7 @@ export async function listFellowshipMembers({ chain } = {}) {
   }
 
   const identityMap = await getIdentityMap({
-    chain,
+    chain: chains.collectives,
     addresses: getMemberAddresses(members),
   });
   return members.map((member) => ({
