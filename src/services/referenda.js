@@ -1,5 +1,5 @@
 import { getChainConfig } from "../config/chains.js";
-import { fetchJson } from "./api.js";
+import { request } from "./api.js";
 
 function getReferendaEndpoints(chain) {
   const { apiUrl, referendaPath } = getChainConfig(chain);
@@ -12,10 +12,10 @@ function getReferendaEndpoints(chain) {
 
 export async function getReferenda({ chain, ...query } = {}) {
   const { listUrl } = getReferendaEndpoints(chain);
-  return fetchJson(listUrl, query);
+  return request.get(listUrl, query);
 }
 
 export async function getReferendaSummary({ chain } = {}) {
   const { summaryUrl } = getReferendaEndpoints(chain);
-  return fetchJson(summaryUrl);
+  return request.get(summaryUrl);
 }
