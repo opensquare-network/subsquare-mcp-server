@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { treasuryChains } from "../config/chains.js";
 import {
   dotTreasuryChains,
   getTreasuryBalances,
@@ -8,8 +9,6 @@ import {
   listTreasuryProjects,
 } from "../services/treasury.js";
 import { createJsonResult, pageSize, readOnlyAnnotations } from "./common.js";
-
-const treasuryChains = ["polkadot", "kusama"];
 
 const projectId = z
   .string()

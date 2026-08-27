@@ -1,6 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import packageJson from "../package.json" with { type: "json" };
-import { registerReferendaTools, registerTreasuryTools } from "./tools/index.js";
+import {
+  registerFellowshipTools,
+  registerReferendaTools,
+  registerTreasuryTools,
+} from "./tools/index.js";
 
 export function createMcpServer() {
   const server = new McpServer({
@@ -8,6 +12,7 @@ export function createMcpServer() {
     version: packageJson.version,
   });
 
+  registerFellowshipTools(server);
   registerReferendaTools(server);
   registerTreasuryTools(server);
   return server;

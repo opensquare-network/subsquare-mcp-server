@@ -1,5 +1,6 @@
+import { chains } from "../config/chain.js";
 import { getChainConfig } from "../config/chains.js";
-import { fetchJson } from "./api.js";
+import { request } from "./api.js";
 
 const PROJECTS_API_PATH = "treasury/status/projects";
 const TREASURY_SUMMARY_API_PATH = "overview/summary";
@@ -18,8 +19,8 @@ export async function listTreasuryProjects({
   page_size = 10,
   include_all = false,
 } = {}) {
-  const { projectsUrl } = getTreasuryEndpoints("polkadot");
-  const projects = await fetchJson(projectsUrl);
+  const { projectsUrl } = getTreasuryEndpoints(chains.polkadot);
+  const projects = await request.get(projectsUrl);
 
   if (!Array.isArray(projects)) {
     throw new Error(
@@ -40,7 +41,7 @@ export async function listTreasuryProjects({
 
 export async function getTreasuryStatus({ chain } = {}) {
   const { summaryUrl } = getTreasuryEndpoints(chain);
-  const summary = await fetchJson(summaryUrl);
+  const summary = await request.get(summaryUrl);
 
   if (!summary) {
     throw new Error(
