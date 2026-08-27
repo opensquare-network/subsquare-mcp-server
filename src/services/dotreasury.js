@@ -3,15 +3,11 @@ import { request } from "./api.js";
 export const dotTreasuryChains = [
   "polkadot",
   "kusama",
-  "basilisk",
   "hydradx",
   "interlay",
-  "kintsugi",
   "acala",
   "karura",
   "bifrost",
-  "moonbeam",
-  "moonriver",
   "astar",
 ];
 
