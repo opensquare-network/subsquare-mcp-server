@@ -114,11 +114,8 @@ export function registerTreasuryTools(server) {
     },
     async (args) => {
       const treasuries = await getTreasuryBalances(args);
-      const structuredContent = { treasuries };
-
       return {
-        content: [],
-        structuredContent,
+        structuredContent: { treasuries },
       };
     },
   );
