@@ -12,10 +12,7 @@ function addQueryParams(url, query) {
   return requestUrl;
 }
 
-async function requestJson(
-  url,
-  { method = "GET", query = {}, body } = {},
-) {
+async function requestJson(url, { method = "GET", query = {}, body } = {}) {
   const hasBody = body !== undefined;
   const headers = {
     accept: "application/json",
