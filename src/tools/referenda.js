@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   getReferenda,
   getReferendaSummary,
+  getReferendum,
 } from "../services/referenda.js";
 import {
   chain,
@@ -73,6 +74,27 @@ export function registerReferendaTools(server) {
     },
     async (args) => {
       const result = await getReferenda(args);
+      return createJsonResult(result);
+    },
+  );
+
+  server.registerTool(
+    "gov2_referendum_detail",
+    {
+      description:
+        "Get the full details of a specific OpenGov referendum (governance proposal) on a configured SubSquare chain by its referendum index. Use it to inspect a single proposal's on-chain state, timeline, and metadata when you already know the index (e.g. from gov2_list_referenda).",
+      inputSchema: {
+        chain,
+        referendum_index: z
+          .number()
+          .int()
+          .nonnegative()
+          .describe("The exact governance referendum index"),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async (args) => {
+      const result = await getReferendum(args);
       return createJsonResult(result);
     },
   );

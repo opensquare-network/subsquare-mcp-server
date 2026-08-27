@@ -19,3 +19,8 @@ export async function getReferendaSummary({ chain } = {}) {
   const { summaryUrl } = getReferendaEndpoints(chain);
   return request.get(summaryUrl);
 }
+
+export async function getReferendum({ chain, referendum_index } = {}) {
+  const { apiUrl, referendaPath } = getChainConfig(chain);
+  return request.get(new URL(`${referendaPath}/${referendum_index}`, apiUrl));
+}
