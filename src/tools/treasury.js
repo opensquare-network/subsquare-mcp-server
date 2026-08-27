@@ -42,6 +42,38 @@ const treasuryBalancesInputSchema = {
     ),
 };
 
+const treasuryAssetBalanceOutputSchema = z.object({
+  balance: z
+    .string()
+    .describe("Raw balance in the token's smallest unit; apply decimals for display"),
+  decimals: z.number().int().nonnegative(),
+  price: z.number().nullable(),
+  priceUpdateAt: z
+    .number()
+    .nullable()
+    .describe("Unix timestamp in milliseconds when the asset price was updated"),
+  token: z.string(),
+});
+
+const treasuryBalanceOutputSchema = z.object({
+  balance: z.string().describe("Chain-level balance as returned by DotTreasury"),
+  balanceUpdateAt: z
+    .number()
+    .nullable()
+    .describe("Unix timestamp in milliseconds when the chain balance was updated"),
+  chain: z.string(),
+  price: z.number().nullable(),
+  priceUpdateAt: z
+    .number()
+    .nullable()
+    .describe("Unix timestamp in milliseconds when the chain price was updated"),
+  balances: z.array(treasuryAssetBalanceOutputSchema).nullable(),
+});
+
+const treasuryBalancesOutputSchema = {
+  treasuries: z.array(treasuryBalanceOutputSchema),
+};
+
 export function registerTreasuryTools(server) {
   server.registerTool(
     "treasury_list_projects",
@@ -75,13 +107,19 @@ export function registerTreasuryTools(server) {
     "treasury_get_balances",
     {
       description:
-        "Get current treasury balances from DotTreasury for every reported chain, or one exact chain. Asset balances in balances are raw decimal strings in each asset's smallest unit; use their decimals before display. The chain-level balance is returned as provided by DotTreasury. Includes chain and asset prices plus their update timestamps.",
+        "Get current treasury balances from DotTreasury. Optionally filter by chain; omit chain to return all reported chains.",
       inputSchema: treasuryBalancesInputSchema,
+      outputSchema: treasuryBalancesOutputSchema,
       annotations: readOnlyAnnotations,
     },
     async (args) => {
-      const result = await getTreasuryBalances(args);
-      return createJsonResult(result);
+      const treasuries = await getTreasuryBalances(args);
+      const structuredContent = { treasuries };
+
+      return {
+        content: [],
+        structuredContent,
+      };
     },
   );
 }
