@@ -7,23 +7,24 @@
   "main": "src/index.js",
   "packageManager": "pnpm@10.15.1",
   "engines": {
-    "node": ">=22.19.0"
+    "node": ">=20.10.0"
   },
   "scripts": {
-    "start": "node --env-file-if-exists=.env src/index.js",
-    "no-proxy-start": "env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy node --env-file-if-exists=.env src/index.js",
-    "inspect": "mcp-inspector --web --transport http --server-url ${MCP_SERVER_URL:-http://127.0.0.1:3210/mcp}",
-    "no-proxy-inspect": "env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy mcp-inspector --web --transport http --server-url ${MCP_SERVER_URL:-http://127.0.0.1:3210/mcp}"
+    "start": "node src/index.js",
+    "no-proxy-start": "HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= http_proxy= https_proxy= all_proxy= NO_PROXY=* no_proxy=* node src/index.js",
+    "inspect": "mcp-inspector",
+    "no-proxy-inspect": "HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= http_proxy= https_proxy= all_proxy= NO_PROXY=* no_proxy=* mcp-inspector"
   },
   "dependencies": {
     "@koa/router": "^15.7.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "koa": "^3.2.1",
     "lodash": "^4.18.1",
-    "undici": "^8.10.0",
+    "dotenv": "^17.2.3",
+    "undici": "^6.28.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^2.3.0"
+    "@modelcontextprotocol/inspector": "0.15.0"
   }
 }

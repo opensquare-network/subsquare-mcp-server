@@ -13,6 +13,14 @@ pnpm run inspect
 claude mcp add --scope user --transport http subsquare-mcp http://127.0.0.1:3210/mcp
 ```
 
+## Reinstall
+
+```bash
+claude mcp remove subsquare-mcp
+
+claude mcp add --scope user --transport http subsquare-mcp http://127.0.0.1:3210/mcp
+```
+
 Available `--scope` values:
 
 - `local`: Local configuration (default)
