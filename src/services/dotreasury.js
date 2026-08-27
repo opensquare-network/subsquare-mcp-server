@@ -4,7 +4,6 @@ export const dotTreasuryChains = [
   "polkadot",
   "kusama",
   "hydradx",
-  "interlay",
   "acala",
   "karura",
   "bifrost",
