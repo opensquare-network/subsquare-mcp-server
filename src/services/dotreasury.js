@@ -1,4 +1,4 @@
-import { postJson } from "./api.js";
+import { request } from "./api.js";
 
 export const dotTreasuryChains = [
   "polkadot",
@@ -36,7 +36,7 @@ const DOT_TREASURY_QUERY = `
 `;
 
 export async function getTreasuryBalances({ chain } = {}) {
-  const response = await postJson(process.env.DOT_TREASURY_GRAPHQL_URL, {
+  const response = await request.post(process.env.DOT_TREASURY_GRAPHQL_URL, {
     operationName: DOT_TREASURY_OPERATION_NAME,
     variables: { chain },
     query: DOT_TREASURY_QUERY,
