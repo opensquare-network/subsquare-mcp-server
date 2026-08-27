@@ -106,7 +106,7 @@ export function registerTreasuryTools(server) {
     "treasury_get_balances",
     {
       description:
-        "Get current treasury balances from DotTreasury. Optionally filter by chain; omit chain to return all reported chains.",
+        "Retrieve current treasury balances for one supported chain or all supported chains. Results include chain totals and available asset balances, decimals, prices, and update times.",
       inputSchema: treasuryBalancesInputSchema,
       outputSchema: treasuryBalancesOutputSchema,
       annotations: readOnlyAnnotations,
