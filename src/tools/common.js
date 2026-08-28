@@ -16,10 +16,19 @@ export const pageSize = z
   .optional()
   .describe("Items per page (default 10)");
 
-export const simple = z
-  .union([z.boolean(), z.enum(["1", "true", "TRUE"])])
+// The SubSquare API accepts booleans as either JSON booleans or the
+// strings "1", "true", "TRUE"
+export const flagValue = z.union([z.boolean(), z.enum(["1", "true", "TRUE"])]);
+
+export const simple = flagValue
   .optional()
   .describe('Set to true, "1", "true", or "TRUE" for simplified fields');
+
+export const includesTitle = flagValue
+  .optional()
+  .describe(
+    'Set to true, "1", "true", or "TRUE" to include the referendum title and state',
+  );
 
 export const chain = z
   .enum(supportedChains)

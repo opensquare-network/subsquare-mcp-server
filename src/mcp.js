@@ -3,6 +3,7 @@ import packageJson from "../package.json" with { type: "json" };
 import {
   registerAddressFellowshipTools,
   registerAddressReferendaTools,
+  registerAddressVotesTools,
   registerFellowshipTools,
   registerReferendaTools,
   registerTreasuryTools,
@@ -16,6 +17,7 @@ export function createMcpServer() {
 
   registerAddressFellowshipTools(server);
   registerAddressReferendaTools(server);
+  registerAddressVotesTools(server);
   registerFellowshipTools(server);
   registerReferendaTools(server);
   registerTreasuryTools(server);
