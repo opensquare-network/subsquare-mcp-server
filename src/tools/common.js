@@ -17,9 +17,9 @@ export const pageSize = z
   .describe("Items per page (default 10)");
 
 export const simple = z
-  .boolean()
+  .union([z.boolean(), z.enum(["1", "true", "TRUE"])])
   .optional()
-  .describe("Set to true for simplified fields");
+  .describe('Set to true, "1", "true", or "TRUE" for simplified fields');
 
 export const chain = z
   .enum(supportedChains)
