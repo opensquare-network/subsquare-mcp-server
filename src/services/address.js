@@ -8,6 +8,10 @@ const USER_REFERENDA_VOTES_PATH = "referenda/votes";
 const USER_FELLOWSHIP_VOTES_PATH = "fellowship/votes";
 const FELLOWSHIP_EVIDENCE_HISTORY_PATH = "fellowship/core/evidences";
 const FELLOWSHIP_SALARY_PAYMENTS_PATH = "fellowship/salary/payments";
+const FELLOWSHIP_MEMBER_SALARY_STATISTICS_PATH =
+  "fellowship/statistics/salary/members";
+const FELLOWSHIP_USER_STATISTICS_PATH = "fellowship/statistics/users";
+const FELLOWSHIP_MEMBER_RANK_RECORDS_PATH = "fellowship/statistics/members";
 
 export async function getUserReferenda({ chain, address, ...query } = {}) {
   const { apiUrl, referendaPath } = getChainConfig(chain);
@@ -58,4 +62,30 @@ export async function getUserFellowshipSalaryPayments({
   const { apiUrl } = getChainConfig(chains.collectives);
   const url = new URL(FELLOWSHIP_SALARY_PAYMENTS_PATH, apiUrl);
   return request.get(url, { ...query, who: address });
+}
+
+export async function getUserFellowshipSalaryStatistics({
+  address,
+} = {}) {
+  const { apiUrl } = getChainConfig(chains.collectives);
+  const url = new URL(
+    `${FELLOWSHIP_MEMBER_SALARY_STATISTICS_PATH}/${address}`,
+    apiUrl,
+  );
+  return request.get(url);
+}
+
+export async function getUserFellowshipStatistics({ address } = {}) {
+  const { apiUrl } = getChainConfig(chains.collectives);
+  const url = new URL(`${FELLOWSHIP_USER_STATISTICS_PATH}/${address}`, apiUrl);
+  return request.get(url);
+}
+
+export async function getUserFellowshipRankRecords({ address } = {}) {
+  const { apiUrl } = getChainConfig(chains.collectives);
+  const url = new URL(
+    `${FELLOWSHIP_MEMBER_RANK_RECORDS_PATH}/${address}/ranks`,
+    apiUrl,
+  );
+  return request.get(url);
 }

@@ -52,6 +52,52 @@ const fellowshipMemberSchema = z
   })
   .passthrough();
 
+const memberStatisticsSchema = z.object({
+  cycles: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe("Number of salary cycles with a claimed payment"),
+  totalPaid: z
+    .record(z.string())
+    .describe("Total claimed salary grouped by asset symbol"),
+  joinedCycles: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe("Number of salary cycles joined by the address"),
+  promotionTimes: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe("Number of promotions recorded for the address"),
+  demotionTimes: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe("Number of demotions recorded for the address"),
+  retentionTimes: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe("Number of retention events recorded for the address"),
+}).passthrough();
+
+const rankRecordSchema = z
+  .object({
+    time: z
+      .number()
+      .nullable()
+      .describe("Block timestamp in milliseconds, when available"),
+    rank: z.number().int().nonnegative().describe("Member rank after the event"),
+    event: z
+      .string()
+      .describe(
+        "Rank event, such as Imported, Inducted, Promoted, Demoted, Proven, or Offboarded",
+      ),
+  })
+  .passthrough();
+
 const historyPageSchema = z.object({
   items: z
     .array(z.object({}).passthrough())
@@ -87,6 +133,12 @@ const fellowshipMemberDetailOutputSchema = {
   voteHistory: historyPageSchema.describe(
     "Fellowship vote records for the address, including referendum title and state when available.",
   ),
+  statistics: memberStatisticsSchema.describe(
+    "Aggregated claimed salary, salary cycles, and rank event counts for the address.",
+  ),
+  rankRecords: z
+    .array(rankRecordSchema)
+    .describe("Chronological Fellowship rank change records for the address."),
 };
 
 export function registerFellowshipTools(server) {
@@ -113,7 +165,7 @@ export function registerFellowshipTools(server) {
     "fellowship_get_member_detail",
     {
       description:
-        "Get a Fellowship member profile and a page of activity history for an address on Polkadot Collectives. Returns evidence submissions, salary payment records, submitted Fellowship referenda, and Fellowship votes. The same page and page_size values apply to all history sections; use them to retrieve different pages. Identity information is included when available; member is null if the address is not currently listed.",
+        "Get a Fellowship member profile, activity history, and aggregated salary/rank statistics for an address on Polkadot Collectives. Returns evidence submissions, salary payment records, submitted Fellowship referenda, Fellowship votes, claimed salary totals by asset, claimed salary cycle count, and rank change records. The same page and page_size values apply to all history sections; use them to retrieve different pages. Identity information is included when available; member is null if the address is not currently listed.",
       inputSchema: {
         address: z
           .string()

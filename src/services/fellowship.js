@@ -4,7 +4,10 @@ import { request } from "./api.js";
 import {
   getUserFellowshipEvidenceHistory,
   getUserFellowshipReferenda,
+  getUserFellowshipRankRecords,
   getUserFellowshipSalaryPayments,
+  getUserFellowshipSalaryStatistics,
+  getUserFellowshipStatistics,
   getUserFellowshipVotes,
 } from "./address.js";
 import { getIdentity, getIdentityMap } from "./identity.js";
@@ -97,6 +100,9 @@ export async function getFellowshipMemberDetail({
     salaryPaymentHistory,
     referendaHistory,
     voteHistory,
+    salaryStatistics,
+    userStatistics,
+    rankRecords,
   ] = await Promise.all([
     getFellowshipMembersAndCoreParams(),
     getUserFellowshipEvidenceHistory({
@@ -121,6 +127,9 @@ export async function getFellowshipMemberDetail({
       page_size,
       includes_title: true,
     }),
+    getUserFellowshipSalaryStatistics({ address }),
+    getUserFellowshipStatistics({ address }),
+    getUserFellowshipRankRecords({ address }),
   ]);
 
   const member = memberData.members.find(
@@ -136,5 +145,10 @@ export async function getFellowshipMemberDetail({
     salaryClaimHistory: salaryPaymentHistory,
     referendaSubmissionHistory: referendaHistory,
     voteHistory,
+    statistics: {
+      ...userStatistics,
+      ...salaryStatistics,
+    },
+    rankRecords,
   };
 }
