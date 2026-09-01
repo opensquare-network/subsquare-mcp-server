@@ -8,7 +8,12 @@ import {
   getTreasuryStatus,
   listTreasuryProjects,
 } from "../services/treasury.js";
-import { createJsonResult, pageSize, readOnlyAnnotations } from "./common.js";
+import {
+  createJsonResult,
+  createStructuredJsonResult,
+  pageSize,
+  readOnlyAnnotations,
+} from "./common.js";
 
 const projectId = z
   .string()
@@ -113,9 +118,7 @@ export function registerTreasuryTools(server) {
     },
     async (args) => {
       const treasuries = await getTreasuryBalances(args);
-      return {
-        structuredContent: { treasuries },
-      };
+      return createStructuredJsonResult({ treasuries });
     },
   );
 }

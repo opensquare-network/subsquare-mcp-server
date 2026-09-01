@@ -1,3 +1,4 @@
+import pick from "lodash/pick.js";
 import { chains } from "../config/chain.js";
 import { getChainConfig } from "../config/chains.js";
 import { request } from "./api.js";
@@ -14,6 +15,57 @@ import { getIdentity, getIdentityMap } from "./identity.js";
 
 const FELLOWSHIP_MEMBERS_PATH = "fellowship/members";
 const FELLOWSHIP_CORE_PARAMS_PATH = "fellowship/core/params";
+const HISTORY_PAGE_FIELDS = ["page", "pageSize", "total"];
+const EVIDENCE_FIELDS = [
+  "cid",
+  "title",
+  "rank",
+  "wish",
+  "referenda",
+  "isActive",
+  "indexer.blockHeight",
+  "indexer.blockTime",
+  "judgedAt.blockHeight",
+  "judgedAt.blockTime",
+  "overwrittenAt.blockHeight",
+  "overwrittenAt.blockTime",
+];
+const SALARY_PAYMENT_FIELDS = [
+  "index",
+  "salary",
+  "amount",
+  "isRegistered",
+  "isPaid",
+  "beneficiary",
+  "memberInfo.rank",
+  "memberInfo.isActive",
+  "indexer.blockHeight",
+  "indexer.blockTime",
+  "paidIndexer.blockHeight",
+  "paidIndexer.blockTime",
+  "paymentId",
+];
+const REFERENDUM_FIELDS = [
+  "referendumIndex",
+  "title",
+  "contentSummary",
+  "track",
+  "proposer",
+  "createdAt",
+  "lastActivityAt",
+  "commentsCount",
+  "state.name",
+];
+const VOTE_FIELDS = [
+  "referendumIndex",
+  "account",
+  "isAye",
+  "votes",
+  "queryAt",
+  "proposal.title",
+  "proposal.state.name",
+];
+const RANK_RECORD_FIELDS = ["time", "rank", "event"];
 
 function getRankInfo(rank, coreParams) {
   if (!Number.isInteger(rank) || !coreParams || rank < 0) {
@@ -38,6 +90,15 @@ function getMemberAddresses(members) {
     .map((member) => member.address);
 }
 
+function pickHistoryPage(history, fields) {
+  return {
+    ...pick(history, HISTORY_PAGE_FIELDS),
+    items: Array.isArray(history?.items)
+      ? history.items.map((item) => pick(item, fields))
+      : [],
+  };
+}
+
 async function getFellowshipMembersAndCoreParams() {
   const { apiUrl } = getChainConfig(chains.collectives);
   const [members, coreParams] = await Promise.all([
@@ -55,10 +116,36 @@ async function getFellowshipMembersAndCoreParams() {
 }
 
 function createFellowshipMember(member, coreParams, identity) {
+  const rankInfo = member.rankInfo ?? getRankInfo(member.rank, coreParams);
+  let compactRankInfo = null;
+  if (rankInfo) {
+    compactRankInfo = {
+      activeSalary: rankInfo.activeSalary ?? null,
+      passiveSalary: rankInfo.passiveSalary ?? null,
+      demotionPeriod: rankInfo.demotionPeriod ?? null,
+      minPromotionPeriod: rankInfo.minPromotionPeriod ?? null,
+      offboardTimeout: rankInfo.offboardTimeout ?? null,
+    };
+  }
+
+  const sourceIdentity = member.identity ?? identity;
+  let compactIdentity = null;
+  if (sourceIdentity && typeof sourceIdentity === "object") {
+    const { address, info } = sourceIdentity;
+    compactIdentity = {
+      address,
+    };
+
+    if (info && typeof info === "object") {
+      compactIdentity.info = pick(info, ["status", "display"]);
+    }
+  }
+
   return {
-    ...member,
-    rankInfo: member.rankInfo ?? getRankInfo(member.rank, coreParams),
-    identity: member.identity ?? identity ?? null,
+    address: member.address,
+    rank: member.rank,
+    rankInfo: compactRankInfo,
+    identity: compactIdentity,
   };
 }
 
@@ -141,14 +228,27 @@ export async function getFellowshipMemberDetail({
     member: member
       ? createFellowshipMember(member, memberData.coreParams, identity)
       : null,
-    evidenceHistory,
-    salaryClaimHistory: salaryPaymentHistory,
-    referendaSubmissionHistory: referendaHistory,
-    voteHistory,
+    evidenceHistory: pickHistoryPage(evidenceHistory, EVIDENCE_FIELDS),
+    salaryClaimHistory: pickHistoryPage(
+      salaryPaymentHistory,
+      SALARY_PAYMENT_FIELDS,
+    ),
+    referendaSubmissionHistory: pickHistoryPage(
+      referendaHistory,
+      REFERENDUM_FIELDS,
+    ),
+    voteHistory: pickHistoryPage(voteHistory, VOTE_FIELDS),
     statistics: {
-      ...userStatistics,
-      ...salaryStatistics,
+      ...pick(salaryStatistics, ["cycles", "totalPaid"]),
+      ...pick(userStatistics, [
+        "joinedCycles",
+        "promotionTimes",
+        "demotionTimes",
+        "retentionTimes",
+      ]),
     },
-    rankRecords,
+    rankRecords: Array.isArray(rankRecords)
+      ? rankRecords.map((record) => pick(record, RANK_RECORD_FIELDS))
+      : [],
   };
 }

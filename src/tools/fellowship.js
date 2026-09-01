@@ -4,19 +4,26 @@ import {
   listFellowshipMembers,
 } from "../services/fellowship.js";
 import {
+  createStructuredJsonResult,
   page,
   pageSize,
   readOnlyAnnotations,
 } from "./common.js";
 
 const rankInfoSchema = z.object({
-  activeSalary: z.string().nullable(),
-  passiveSalary: z.string().nullable(),
+  activeSalary: z
+    .string()
+    .nullable()
+    .describe("Active salary as a raw hexadecimal/base-unit string"),
+  passiveSalary: z
+    .string()
+    .nullable()
+    .describe("Passive salary as a raw hexadecimal/base-unit string"),
   demotionPeriod: z
     .number()
     .int()
     .nullable()
-    .describe("Blocks before demotion"),
+    .describe("Configured number of blocks before demotion at this rank"),
   minPromotionPeriod: z
     .number()
     .int()
@@ -26,31 +33,36 @@ const rankInfoSchema = z.object({
     .number()
     .int()
     .nullable()
-    .describe("Blocks a Rank 0 candidate may remain before offboarding"),
+    .describe(
+      "Configured maximum blocks a rank-0 candidate may remain before offboarding",
+    ),
 });
 
 const identitySchema = z
   .object({
-    address: z.string(),
+    address: z.string().describe("Address associated with the identity"),
     info: z
       .object({
         status: z.string().optional().describe("Identity verification status"),
-        display: z.string().optional(),
+        display: z.string().optional().describe("Display name, when available"),
       })
-      .passthrough()
       .optional(),
   })
-  .passthrough()
+  .describe("Optional StateScan identity information")
   .nullable();
 
-const fellowshipMemberSchema = z
-  .object({
-    address: z.string().describe("Member's SS58 address"),
-    rank: z.number().int().describe("Fellowship rank"),
-    rankInfo: rankInfoSchema.nullable().describe("Current rank parameters"),
-    identity: identitySchema,
-  })
-  .passthrough();
+const fellowshipMemberSchema = z.object({
+  address: z.string().describe("Roster entry's SS58 address"),
+  rank: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe("Reported Fellowship rank; rank 0 denotes a candidate"),
+  rankInfo: rankInfoSchema
+    .nullable()
+    .describe("Derived parameters for the reported rank"),
+  identity: identitySchema,
+});
 
 const memberStatisticsSchema = z.object({
   cycles: z
@@ -60,7 +72,9 @@ const memberStatisticsSchema = z.object({
     .describe("Number of salary cycles with a claimed payment"),
   totalPaid: z
     .record(z.string())
-    .describe("Total claimed salary grouped by asset symbol"),
+    .describe(
+      "API-reported claimed salary totals as strings, grouped by asset symbol",
+    ),
   joinedCycles: z
     .number()
     .int()
@@ -81,28 +95,30 @@ const memberStatisticsSchema = z.object({
     .int()
     .nonnegative()
     .describe("Number of retention events recorded for the address"),
-}).passthrough();
+});
 
-const rankRecordSchema = z
-  .object({
-    time: z
-      .number()
-      .nullable()
-      .describe("Block timestamp in milliseconds, when available"),
-    rank: z.number().int().nonnegative().describe("Member rank after the event"),
-    event: z
-      .string()
-      .describe(
-        "Rank event, such as Imported, Inducted, Promoted, Demoted, Proven, or Offboarded",
-      ),
-  })
-  .passthrough();
+const rankRecordSchema = z.object({
+  time: z
+    .number()
+    .nullable()
+    .describe("Block timestamp in milliseconds, when available"),
+  rank: z.number().int().nonnegative().describe("Member rank after the event"),
+  event: z
+    .string()
+    .describe(
+      "Rank event, such as Imported, Inducted, Promoted, Demoted, Proven, or Offboarded",
+    ),
+});
 
 const historyPageSchema = z.object({
   items: z
     .array(z.object({}).passthrough())
-    .describe("Records returned for this history section"),
-  page: z.number().int().positive().describe("Page number returned by Subsquare"),
+    .describe("Selected compact records; fields vary by history section"),
+  page: z
+    .number()
+    .int()
+    .positive()
+    .describe("Page number returned by Subsquare"),
   pageSize: z
     .number()
     .int()
@@ -119,26 +135,26 @@ const fellowshipMemberDetailOutputSchema = {
   member: fellowshipMemberSchema
     .nullable()
     .describe(
-      "Current Fellowship member profile, or null when the address is not in the current member list.",
+      "Current Fellowship member or rank-0 candidate profile, or null when the address is not in the current roster.",
     ),
   evidenceHistory: historyPageSchema.describe(
-    "Fellowship evidence submissions for the address, including content when available.",
+    "Selected compact Fellowship evidence records. CID, title, rank, wish, status, related referendum summaries, and selected block metadata are retained; markdown content and raw payloads are omitted.",
   ),
   salaryClaimHistory: historyPageSchema.describe(
-    "Fellowship salary payment records for the address, including registration and payment status.",
+    "Selected compact Fellowship salary records. The cycle index, salary and amount as returned by the API, registration/payment status, beneficiary, historical rank, and block metadata are retained.",
   ),
   referendaSubmissionHistory: historyPageSchema.describe(
-    "Simplified Fellowship referenda submitted by the address.",
+    "Selected compact Fellowship referenda submitted by the address. Index, title/summary, track, proposer, activity timestamps, comment count, and state are retained; on-chain call payloads are omitted.",
   ),
   voteHistory: historyPageSchema.describe(
-    "Fellowship vote records for the address, including referendum title and state when available.",
+    "Selected compact Fellowship vote records with referendum index, account, aye/nay direction, vote value, query block, title, and state.",
   ),
   statistics: memberStatisticsSchema.describe(
-    "Aggregated claimed salary, salary cycles, and rank event counts for the address.",
+    "Aggregated salary statistics for the address: claimed cycles and totals by asset, joined cycles, and promotion, demotion, and retention counts.",
   ),
   rankRecords: z
     .array(rankRecordSchema)
-    .describe("Chronological Fellowship rank change records for the address."),
+    .describe("Unpaginated Fellowship rank event records for the address."),
 };
 
 export function registerFellowshipTools(server) {
@@ -146,7 +162,7 @@ export function registerFellowshipTools(server) {
     "fellowship_list_members",
     {
       description:
-        "List current Fellowship members on the Polkadot Collectives chain. Each member includes an SS58 address, Fellowship rank, rankInfo with salary and timing parameters, and an optional identity record.",
+        "List the current Polkadot Technical Fellowship roster on Polkadot Collectives, including rank-0 candidates. Each record provides an SS58 address, rank (0 denotes a candidate), derived rank parameters, and StateScan identity when available.",
       inputSchema: {},
       outputSchema: {
         members: z.array(fellowshipMemberSchema),
@@ -155,9 +171,7 @@ export function registerFellowshipTools(server) {
     },
     async () => {
       const result = await listFellowshipMembers();
-      return {
-        structuredContent: { members: result },
-      };
+      return createStructuredJsonResult({ members: result });
     },
   );
 
@@ -165,14 +179,14 @@ export function registerFellowshipTools(server) {
     "fellowship_get_member_detail",
     {
       description:
-        "Get a Fellowship member profile, activity history, and aggregated salary/rank statistics for an address on Polkadot Collectives. Returns evidence submissions, salary payment records, submitted Fellowship referenda, Fellowship votes, claimed salary totals by asset, claimed salary cycle count, and rank change records. The same page and page_size values apply to all history sections; use them to retrieve different pages. Identity information is included when available; member is null if the address is not currently listed.",
+        "Get a current Fellowship member or rank-0 candidate profile, four paginated activity histories, and salary/rank statistics for an SS58 address on Polkadot Collectives. Histories use selected compact fields: evidence markdown/raw payloads and referendum call payloads are omitted. One page and page_size apply to evidence, salary claims, submitted referenda, and votes; rankRecords is unpaginated. Identity is included when available, and member is null when the address is not in the current roster.",
       inputSchema: {
         address: z
           .string()
           .trim()
           .min(1)
           .describe(
-            "SS58 address whose Fellowship profile and activity history to look up",
+            "SS58 address whose current or historical Fellowship activity to look up",
           ),
         page,
         page_size: pageSize,
@@ -182,9 +196,7 @@ export function registerFellowshipTools(server) {
     },
     async (args) => {
       const detail = await getFellowshipMemberDetail(args);
-      return {
-        structuredContent: detail,
-      };
+      return createStructuredJsonResult(detail);
     },
   );
 }

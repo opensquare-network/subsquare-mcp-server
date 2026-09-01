@@ -38,13 +38,21 @@ export const readOnlyAnnotations = {
   readOnlyHint: true,
 };
 
+function createJsonTextContent(data) {
+  return {
+    type: "text",
+    text: JSON.stringify(data),
+  };
+}
+
 export function createJsonResult(data) {
   return {
-    content: [
-      {
-        type: "text",
-        text: JSON.stringify(data),
-      },
-    ],
+    content: [createJsonTextContent(data)],
+  };
+}
+
+export function createStructuredJsonResult(data) {
+  return {
+    structuredContent: data,
   };
 }
