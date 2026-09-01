@@ -6,6 +6,8 @@ import { request } from "./api.js";
 const USER_FELLOWSHIP_REFERENDA_PATH = "fellowship/referendums";
 const USER_REFERENDA_VOTES_PATH = "referenda/votes";
 const USER_FELLOWSHIP_VOTES_PATH = "fellowship/votes";
+const FELLOWSHIP_EVIDENCE_HISTORY_PATH = "fellowship/core/evidences";
+const FELLOWSHIP_SALARY_PAYMENTS_PATH = "fellowship/salary/payments";
 
 export async function getUserReferenda({ chain, address, ...query } = {}) {
   const { apiUrl, referendaPath } = getChainConfig(chain);
@@ -38,4 +40,22 @@ export async function getUserFellowshipVotes({ address, ...query } = {}) {
     apiUrl,
   );
   return request.get(url, query);
+}
+
+export async function getUserFellowshipEvidenceHistory({
+  address,
+  ...query
+} = {}) {
+  const { apiUrl } = getChainConfig(chains.collectives);
+  const url = new URL(FELLOWSHIP_EVIDENCE_HISTORY_PATH, apiUrl);
+  return request.get(url, { ...query, who: address });
+}
+
+export async function getUserFellowshipSalaryPayments({
+  address,
+  ...query
+} = {}) {
+  const { apiUrl } = getChainConfig(chains.collectives);
+  const url = new URL(FELLOWSHIP_SALARY_PAYMENTS_PATH, apiUrl);
+  return request.get(url, { ...query, who: address });
 }
