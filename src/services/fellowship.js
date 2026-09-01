@@ -12,9 +12,20 @@ import {
   getUserFellowshipVotes,
 } from "./address.js";
 import { getIdentity, getIdentityMap } from "./identity.js";
+import { formatAmount } from "../utils/amount.js";
 
 const FELLOWSHIP_MEMBERS_PATH = "fellowship/members";
 const FELLOWSHIP_CORE_PARAMS_PATH = "fellowship/core/params";
+const SCAN_HEIGHT_PATH = "inspect/scan-height";
+const DEFAULT_FELLOWSHIP_SALARY_ASSET = Object.freeze({
+  symbol: "USDT",
+  decimals: 6,
+});
+const HOLLAR_SALARY_START_BLOCK = 9_247_655;
+const HOLLAR_FELLOWSHIP_SALARY_ASSET = Object.freeze({
+  symbol: "HOLLAR",
+  decimals: 18,
+});
 const HISTORY_PAGE_FIELDS = ["page", "pageSize", "total"];
 const EVIDENCE_FIELDS = [
   "cid",
@@ -67,6 +78,22 @@ const VOTE_FIELDS = [
 ];
 const RANK_RECORD_FIELDS = ["time", "rank", "event"];
 
+function getFellowshipSalaryAsset(blockHeight) {
+  if (
+    Number.isInteger(blockHeight) &&
+    blockHeight >= HOLLAR_SALARY_START_BLOCK
+  ) {
+    return HOLLAR_FELLOWSHIP_SALARY_ASSET;
+  }
+
+  return DEFAULT_FELLOWSHIP_SALARY_ASSET;
+}
+
+function formatFellowshipSalaryDisplay(rawSalary, salaryAsset) {
+  const salary = formatAmount(rawSalary, salaryAsset.decimals);
+  return salary === null ? null : `${salary} ${salaryAsset.symbol}`;
+}
+
 function getRankInfo(rank, coreParams) {
   if (!Number.isInteger(rank) || !coreParams || rank < 0) {
     return null;
@@ -101,9 +128,10 @@ function pickHistoryPage(history, fields) {
 
 async function getFellowshipMembersAndCoreParams() {
   const { apiUrl } = getChainConfig(chains.collectives);
-  const [members, coreParams] = await Promise.all([
+  const [members, coreParams, scanStatus] = await Promise.all([
     request.get(new URL(FELLOWSHIP_MEMBERS_PATH, apiUrl)),
     request.get(new URL(FELLOWSHIP_CORE_PARAMS_PATH, apiUrl)),
+    request.get(new URL(SCAN_HEIGHT_PATH, apiUrl)),
   ]);
 
   if (!Array.isArray(members)) {
@@ -112,16 +140,28 @@ async function getFellowshipMembersAndCoreParams() {
     );
   }
 
-  return { members, coreParams };
+  return {
+    members,
+    coreParams,
+    blockHeight: Number.isInteger(scanStatus?.value) ? scanStatus.value : null,
+  };
 }
 
-function createFellowshipMember(member, coreParams, identity) {
+function createFellowshipMember(member, coreParams, identity, blockHeight) {
   const rankInfo = member.rankInfo ?? getRankInfo(member.rank, coreParams);
   let compactRankInfo = null;
   if (rankInfo) {
+    const salaryAsset = getFellowshipSalaryAsset(blockHeight);
+
     compactRankInfo = {
-      activeSalary: rankInfo.activeSalary ?? null,
-      passiveSalary: rankInfo.passiveSalary ?? null,
+      activeSalary: formatFellowshipSalaryDisplay(
+        rankInfo.activeSalary,
+        salaryAsset,
+      ),
+      passiveSalary: formatFellowshipSalaryDisplay(
+        rankInfo.passiveSalary,
+        salaryAsset,
+      ),
       demotionPeriod: rankInfo.demotionPeriod ?? null,
       minPromotionPeriod: rankInfo.minPromotionPeriod ?? null,
       offboardTimeout: rankInfo.offboardTimeout ?? null,
@@ -165,14 +205,20 @@ async function getFellowshipMemberIdentity(member) {
 }
 
 export async function listFellowshipMembers() {
-  const { members, coreParams } = await getFellowshipMembersAndCoreParams();
+  const { members, coreParams, blockHeight } =
+    await getFellowshipMembersAndCoreParams();
 
   const identityMap = await getIdentityMap({
     chain: chains.collectives,
     addresses: getMemberAddresses(members),
   });
   return members.map((member) =>
-    createFellowshipMember(member, coreParams, identityMap.get(member.address)),
+    createFellowshipMember(
+      member,
+      coreParams,
+      identityMap.get(member.address),
+      blockHeight,
+    ),
   );
 }
 
@@ -226,7 +272,12 @@ export async function getFellowshipMemberDetail({
 
   return {
     member: member
-      ? createFellowshipMember(member, memberData.coreParams, identity)
+      ? createFellowshipMember(
+          member,
+          memberData.coreParams,
+          identity,
+          memberData.blockHeight,
+        )
       : null,
     evidenceHistory: pickHistoryPage(evidenceHistory, EVIDENCE_FIELDS),
     salaryClaimHistory: pickHistoryPage(

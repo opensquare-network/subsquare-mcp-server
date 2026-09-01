@@ -14,11 +14,15 @@ const rankInfoSchema = z.object({
   activeSalary: z
     .string()
     .nullable()
-    .describe("Active salary as a raw hexadecimal/base-unit string"),
+    .describe(
+      "Human-readable active salary with its asset symbol, such as '16666.666666 HOLLAR'",
+    ),
   passiveSalary: z
     .string()
     .nullable()
-    .describe("Passive salary as a raw hexadecimal/base-unit string"),
+    .describe(
+      "Human-readable passive salary with its asset symbol, such as '8333.333333 HOLLAR'",
+    ),
   demotionPeriod: z
     .number()
     .int()
