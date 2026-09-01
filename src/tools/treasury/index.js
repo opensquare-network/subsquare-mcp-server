@@ -1,39 +1,23 @@
 import { z } from "zod";
-import { treasuryChains } from "../config/chains.js";
+import { treasuryChains } from "../../config/chains.js";
 import {
   dotTreasuryChains,
   getTreasuryBalances,
-} from "../services/dotreasury.js";
+} from "../../services/dotreasury.js";
 import {
   getTreasuryStatus,
   listTreasuryProjects,
-} from "../services/treasury.js";
+} from "../../services/treasury/index.js";
 import {
   createJsonResult,
   createStructuredJsonResult,
-  pageSize,
   readOnlyAnnotations,
-} from "./common.js";
-
-const projectId = z
-  .string()
-  .trim()
-  .min(1)
-  .max(100)
-  .describe("SubSquare Treasury project ID, for example 'nova'");
+} from "../common.js";
+import { registerTreasuryProjectTools } from "./projects.js";
 
 const treasuryChain = z
   .enum(treasuryChains)
   .describe("Treasury chain to query: polkadot or kusama");
-
-const treasuryProjectsInputSchema = {
-  project_id: projectId.optional(),
-  page_size: pageSize,
-  include_all: z
-    .boolean()
-    .optional()
-    .describe("Set to true only when every project is required"),
-};
 
 const treasuryStatusInputSchema = { chain: treasuryChain };
 
@@ -78,20 +62,31 @@ const treasuryBalancesOutputSchema = {
   treasuries: z.array(treasuryBalanceOutputSchema),
 };
 
+function summarizeTreasuryProject(project) {
+  return {
+    id: project.id,
+    name: project.name ?? null,
+    nameAbbr: project.nameAbbr ?? null,
+    category: project.category ?? null,
+  };
+}
+
 export function registerTreasuryTools(server) {
   server.registerTool(
     "treasury_list_projects",
     {
       description:
-        "Find Polkadot Treasury-funded projects and inspect their funding, category, links, and related proposals, spends, bounties, child bounties, and tips. Returns up to page_size projects by default, supports an exact project_id filter, and returns every project only when include_all is true. Supports Polkadot only.",
-      inputSchema: treasuryProjectsInputSchema,
+        "List every Polkadot Treasury project with basic metadata only. No proposal, spend, tip, bounty, or other detail requests are made. Use treasury_get_project_detail with a selected project_id to retrieve that project's linked record details.",
+      inputSchema: {},
       annotations: readOnlyAnnotations,
     },
-    async (args) => {
-      const result = await listTreasuryProjects(args);
-      return createJsonResult(result);
+    async () => {
+      const result = await listTreasuryProjects();
+      return createJsonResult(result.map(summarizeTreasuryProject));
     },
   );
+
+  registerTreasuryProjectTools(server);
 
   server.registerTool(
     "treasury_get_status",
