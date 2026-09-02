@@ -1,44 +1,109 @@
+import pick from "lodash/pick.js";
 import { getTreasuryProjectItemDetail } from "../api.js";
 import { calculateTreasuryItemFiat } from "./amounts.js";
 
-const projectItemTypes = Object.freeze([
-  {
-    type: "proposal",
-    projectField: "proposals",
-    idField: "id",
-    detailPath: "treasury/proposals",
-  },
-  {
-    type: "spend",
-    projectField: "spends",
-    idField: "id",
-    detailPath: "treasury/spends",
-  },
-  {
-    type: "childBounty",
-    projectField: "childBounties",
-    idField: "id",
-    detailPath: "treasury/child-bounties",
-  },
-  {
-    type: "tip",
-    projectField: "tips",
-    idField: "hash",
-    detailPath: "treasury/tips",
-  },
-  {
-    type: "bounty",
-    projectField: "bounties",
-    idField: "id",
-    detailPath: "treasury/bounties",
-  },
-  {
-    type: "multiAssetBounty",
-    projectField: "multiAssetBounties",
-    idField: "id",
-    detailPath: "treasury/multi-asset-bounties",
-  },
-].map((itemType) => Object.freeze(itemType)));
+const PROJECT_FIELDS = [
+  "id",
+  "name",
+  "nameAbbr",
+  "description",
+  "links",
+  "category",
+  "fiatAtSubmission",
+  "fiatAtFinal",
+  "proposalsCount",
+];
+const PROJECT_ITEM_RELATION_FIELDS = [
+  "id",
+  "hash",
+  "parentBountyId",
+  "index",
+  "blockHeight",
+  "proportion",
+];
+const PROJECT_ITEM_DETAIL_FIELDS = [
+  "proposalIndex",
+  "referendumIndex",
+  "bountyIndex",
+  "parentBountyId",
+  "index",
+  "hash",
+  "title",
+  "contentSummary.summary",
+  "state",
+  "proposer",
+  "finder",
+  "beneficiary",
+  "track",
+  "createdAt",
+  "lastActivityAt",
+  "dValue",
+  "onchainData.isFinal",
+];
+const POLKADOT_SUBSQUARE_URL = "https://polkadot.subsquare.io/";
+
+const projectItemTypes = Object.freeze(
+  [
+    {
+      type: "proposal",
+      projectField: "proposals",
+      idField: "id",
+      detailPath: "treasury/proposals",
+      detailFields: ["onchainData.value"],
+    },
+    {
+      type: "spend",
+      projectField: "spends",
+      idField: "id",
+      detailPath: "treasury/spends",
+      detailFields: [
+        "onchainData.extracted.amount",
+        "onchainData.extracted.assetKind",
+        "onchainData.extracted.beneficiary",
+      ],
+    },
+    {
+      type: "childBounty",
+      projectField: "childBounties",
+      idField: "id",
+      detailPath: "treasury/child-bounties",
+      detailFields: [
+        "onchainData.value",
+        "onchainData.fee",
+        "onchainData.curator",
+      ],
+    },
+    {
+      type: "tip",
+      projectField: "tips",
+      idField: "hash",
+      detailPath: "treasury/tips",
+      detailFields: ["onchainData.medianValue", "onchainData.tipFindersFee"],
+    },
+    {
+      type: "bounty",
+      projectField: "bounties",
+      idField: "id",
+      detailPath: "treasury/bounties",
+      detailFields: ["onchainData.value", "onchainData.extractedCurators"],
+    },
+    {
+      type: "multiAssetBounty",
+      projectField: "multiAssetBounties",
+      idField: "id",
+      detailPath: "treasury/multi-asset-bounties",
+      detailFields: [
+        "onchainData.value",
+        "onchainData.assetKind",
+        "onchainData.curator",
+      ],
+    },
+  ].map((itemType) => Object.freeze(itemType)),
+);
+
+export function summarizeTreasuryProject(project) {
+  return pick(project, PROJECT_FIELDS);
+}
 
 function getProjectItemId(itemType, relation) {
   const id = String(relation[itemType.idField] ?? "").trim();
@@ -61,6 +126,29 @@ function getProjectItemId(itemType, relation) {
   );
 }
 
+function createProjectItemUrl(itemType, id) {
+  return new URL(
+    itemType.detailPath + "/" + encodeURIComponent(id),
+    POLKADOT_SUBSQUARE_URL,
+  ).toString();
+}
+
+function createProjectItem(itemType, relation, detail, id) {
+  return {
+    ...pick(relation, PROJECT_ITEM_RELATION_FIELDS),
+    url: createProjectItemUrl(itemType, id),
+    detail: pick(detail, [
+      ...PROJECT_ITEM_DETAIL_FIELDS,
+      ...itemType.detailFields,
+    ]),
+    ...calculateTreasuryItemFiat({
+      type: itemType.type,
+      detail,
+      proportion: relation.proportion,
+    }),
+  };
+}
+
 export async function fetchProjectDetails(project) {
   const entries = await Promise.all(
     projectItemTypes.map(async (itemType) => {
@@ -75,15 +163,7 @@ export async function fetchProjectDetails(project) {
             id,
           );
 
-          return {
-            ...relation,
-            detail,
-            ...calculateTreasuryItemFiat({
-              type: itemType.type,
-              detail,
-              proportion: relation.proportion,
-            }),
-          };
+          return createProjectItem(itemType, relation, detail, id);
         }),
       );
 
@@ -92,7 +172,7 @@ export async function fetchProjectDetails(project) {
   );
 
   return {
-    ...project,
+    ...summarizeTreasuryProject(project),
     ...Object.fromEntries(entries),
   };
 }

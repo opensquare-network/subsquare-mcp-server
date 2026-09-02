@@ -7,6 +7,7 @@ import {
 import {
   getTreasuryStatus,
   listTreasuryProjects,
+  summarizeTreasuryProject,
 } from "../../services/treasury/index.js";
 import {
   createJsonResult,
@@ -33,28 +34,38 @@ const treasuryBalancesInputSchema = {
 const treasuryAssetBalanceOutputSchema = z.object({
   balance: z
     .string()
-    .describe("Raw balance in the token's smallest unit; apply decimals for display"),
+    .describe(
+      "Raw balance in the token's smallest unit; apply decimals for display",
+    ),
   decimals: z.number().int().nonnegative(),
   price: z.number().nullable(),
   priceUpdateAt: z
     .number()
     .nullable()
-    .describe("Unix timestamp in milliseconds when the asset price was updated"),
+    .describe(
+      "Unix timestamp in milliseconds when the asset price was updated",
+    ),
   token: z.string(),
 });
 
 const treasuryBalanceOutputSchema = z.object({
-  balance: z.string().describe("Chain-level balance as returned by DotTreasury"),
+  balance: z
+    .string()
+    .describe("Chain-level balance as returned by DotTreasury"),
   balanceUpdateAt: z
     .number()
     .nullable()
-    .describe("Unix timestamp in milliseconds when the chain balance was updated"),
+    .describe(
+      "Unix timestamp in milliseconds when the chain balance was updated",
+    ),
   chain: z.string(),
   price: z.number().nullable(),
   priceUpdateAt: z
     .number()
     .nullable()
-    .describe("Unix timestamp in milliseconds when the chain price was updated"),
+    .describe(
+      "Unix timestamp in milliseconds when the chain price was updated",
+    ),
   balances: z.array(treasuryAssetBalanceOutputSchema).nullable(),
 });
 
@@ -62,21 +73,12 @@ const treasuryBalancesOutputSchema = {
   treasuries: z.array(treasuryBalanceOutputSchema),
 };
 
-function summarizeTreasuryProject(project) {
-  return {
-    id: project.id,
-    name: project.name ?? null,
-    nameAbbr: project.nameAbbr ?? null,
-    category: project.category ?? null,
-  };
-}
-
 export function registerTreasuryTools(server) {
   server.registerTool(
     "treasury_list_projects",
     {
       description:
-        "List every Polkadot Treasury project with basic metadata only. No proposal, spend, tip, bounty, or other detail requests are made. Use treasury_get_project_detail with a selected project_id to retrieve that project's linked record details.",
+        "List every Polkadot Treasury project with compact metadata: ID, name, category, description, links, reported aggregate USD values, and proposal count. No linked proposal, spend, tip, bounty, or other detail requests are made. Use treasury_get_project_detail with a selected project_id to retrieve that project's linked record details.",
       inputSchema: {},
       annotations: readOnlyAnnotations,
     },

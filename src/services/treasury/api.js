@@ -1,9 +1,29 @@
+import { LRUCache } from "lru-cache";
 import { chains } from "../../config/chain.js";
 import { getChainConfig } from "../../config/chains.js";
 import { request } from "../api.js";
 
 const PROJECTS_API_PATH = "treasury/status/projects";
 const TREASURY_SUMMARY_API_PATH = "overview/summary";
+const PROJECTS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+const projectsCache = new LRUCache({
+  max: 1,
+  ttl: PROJECTS_CACHE_TTL_MS,
+  fetchMethod: async () => {
+    const projects = await request.get(
+      createTreasuryUrl(PROJECTS_API_PATH, chains.polkadot),
+    );
+
+    if (!Array.isArray(projects)) {
+      throw new Error(
+        "SubSquare Treasury Projects response did not include projects",
+      );
+    }
+
+    return projects;
+  },
+});
 
 function createTreasuryUrl(path, chain) {
   const { apiUrl } = getChainConfig(chain);
@@ -22,22 +42,12 @@ function createProjectItemUrl(detailPath, id) {
   );
 }
 
-export async function getTreasuryProjectItemDetail(detailPath, id) {
+export function getTreasuryProjectItemDetail(detailPath, id) {
   return request.get(createProjectItemUrl(detailPath, id));
 }
 
-export async function listTreasuryProjects() {
-  const projects = await request.get(
-    createTreasuryUrl(PROJECTS_API_PATH, chains.polkadot),
-  );
-
-  if (!Array.isArray(projects)) {
-    throw new Error(
-      "SubSquare Treasury Projects response did not include projects",
-    );
-  }
-
-  return projects;
+export function listTreasuryProjects() {
+  return projectsCache.fetch(chains.polkadot);
 }
 
 export async function getTreasuryStatus({ chain } = {}) {
