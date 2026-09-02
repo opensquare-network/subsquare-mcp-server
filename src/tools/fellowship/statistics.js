@@ -4,6 +4,7 @@ import {
   getFellowshipRankChangeStatistics,
   getFellowshipSalaryByRank,
   getFellowshipSalaryOverview,
+  listFellowshipSalaryClaimants,
 } from "../../services/fellowship/statistics.js";
 import {
   accountAddress,
@@ -80,6 +81,18 @@ const rankRecordSchema = z.object({
     .describe("Block timestamp in milliseconds, when available"),
   rank: z.number().int().nonnegative().describe("Rank after the event"),
   event: z.string().describe("Recorded Fellowship rank event"),
+});
+
+const salaryClaimantSchema = z.object({
+  who: accountAddress.describe("Salary claimant's SS58 address"),
+  cycles: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe("Number of salary cycles claimed by the address"),
+  salary: salaryAssetAmountsSchema.describe(
+    "Total salary claimed by the address, split by asset",
+  ),
 });
 
 export function registerFellowshipStatisticsTools(server) {
@@ -177,6 +190,23 @@ export function registerFellowshipStatisticsTools(server) {
     async (args) => {
       const result = await getFellowshipMemberStatistics(args);
       return createStructuredJsonResult(result);
+    },
+  );
+
+  server.registerTool(
+    "list_fellowship_salary_claimants",
+    {
+      description:
+        "List all Fellowship salary claimants ordered by the salary statistics API, including claimed cycle counts and totals by asset.",
+      inputSchema: {},
+      outputSchema: {
+        claimants: z.array(salaryClaimantSchema),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async () => {
+      const claimants = await listFellowshipSalaryClaimants();
+      return createStructuredJsonResult({ claimants });
     },
   );
 }

@@ -13,6 +13,8 @@ const FELLOWSHIP_SALARY_CYCLES_STATISTICS_PATH =
   "fellowship/statistics/salary/cycles";
 const FELLOWSHIP_SALARY_RANKS_STATISTICS_PATH =
   "fellowship/statistics/salary/ranks";
+const FELLOWSHIP_SALARY_CLAIMANTS_STATISTICS_PATH =
+  "fellowship/statistics/salary/members";
 const FELLOWSHIP_MEMBERSHIP_TIMES_STATISTICS_PATH =
   "fellowship/statistics/membership/times";
 const SALARY_ASSETS = ["usdt", "hollar"];
@@ -160,6 +162,16 @@ export async function getFellowshipSalaryByRank() {
       percentage: calculatePercentage(rank.totalSalary, totalSalary),
     })),
   };
+}
+
+export async function listFellowshipSalaryClaimants() {
+  const response = await request.get(
+    createCollectivesUrl(FELLOWSHIP_SALARY_CLAIMANTS_STATISTICS_PATH),
+  );
+  return requireArrayResponse(
+    response,
+    "Fellowship salary claimants statistics",
+  );
 }
 
 export async function getFellowshipRankChangeStatistics() {
