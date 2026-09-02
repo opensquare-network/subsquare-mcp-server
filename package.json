@@ -11,9 +11,7 @@
   },
   "scripts": {
     "start": "node src/index.js",
-    "no-proxy-start": "HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= http_proxy= https_proxy= all_proxy= NO_PROXY=* no_proxy=* node src/index.js",
-    "inspect": "mcp-inspector",
-    "no-proxy-inspect": "HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= http_proxy= https_proxy= all_proxy= NO_PROXY=* no_proxy=* mcp-inspector"
+    "no-proxy-start": "HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= http_proxy= https_proxy= all_proxy= NO_PROXY=* no_proxy=* node src/index.js"
   },
   "dependencies": {
     "@koa/router": "^15.7.0",
@@ -26,8 +24,5 @@
     "p-limit": "^7.3.2",
     "undici": "^6.28.0",
     "zod": "^3.25.76"
-  },
-  "devDependencies": {
-    "@modelcontextprotocol/inspector": "0.15.0"
   }
 }
