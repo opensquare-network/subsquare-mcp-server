@@ -16,12 +16,14 @@ import { registerFellowshipTreasuryTools } from "./fellowship/treasury.js";
 const rankInfoSchema = z.object({
   activeSalary: z
     .string()
+    .min(0)
     .nullable()
     .describe(
       "Human-readable active salary with its asset symbol, such as '16666.666666 HOLLAR'",
     ),
   passiveSalary: z
     .string()
+    .min(0)
     .nullable()
     .describe(
       "Human-readable passive salary with its asset symbol, such as '8333.333333 HOLLAR'",
@@ -107,6 +109,7 @@ const memberStatisticsSchema = z.object({
 const rankRecordSchema = z.object({
   time: z
     .number()
+    .finite()
     .nullable()
     .describe("Block timestamp in milliseconds, when available"),
   rank: z.number().int().nonnegative().describe("Member rank after the event"),

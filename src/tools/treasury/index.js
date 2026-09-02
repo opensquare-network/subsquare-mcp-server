@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v4";
 import { treasuryChains } from "../../config/chains.js";
 import {
   dotTreasuryChains,

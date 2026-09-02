@@ -22,6 +22,7 @@ const fellowshipTreasurySpendSchema = z.object({
   state: z.string().describe("API-reported spend state"),
   amount: z
     .string()
+    .min(0)
     .nullable()
     .describe(
       "Human-readable requested amount with asset symbol; null when the asset is unavailable or unsupported",
@@ -32,6 +33,7 @@ const fellowshipTreasurySpendDetailSchema = fellowshipTreasurySpendSchema.extend
   {
     beneficiary: z
       .string()
+      .min(0)
       .nullable()
       .describe("Beneficiary SS58 address, when available"),
     referendumIndex: z
@@ -40,7 +42,11 @@ const fellowshipTreasurySpendDetailSchema = fellowshipTreasurySpendSchema.extend
       .nonnegative()
       .nullable()
       .describe("Related Fellowship referendum index, when available"),
-    content: z.string().nullable().describe("Spend markdown content"),
+    content: z
+      .string()
+      .min(0)
+      .nullable()
+      .describe("Spend markdown content"),
   },
 );
 
