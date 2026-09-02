@@ -44,7 +44,7 @@ export function registerSecretaryStatisticsTools(server) {
     "secretary_salary_statistics",
     {
       description:
-        "Summarize Polkadot Secretary salary spending on Polkadot Collectives, mirroring the SubSquare Secretary statistics page. Returns the total salary paid across all cycles plus the interim funding DOT received via payment referenda (totalPaid, split by USDT, HOLLAR and DOT), the combined USD total (totalUsd, treating USDT/HOLLAR as ~1 USD and valuing DOT at each referenda's reported price), and a per-address breakdown (byAddress) covering every current member plus every historical beneficiary that ever received interim funding DOT. Each record holds the address's paid salary (USDT and HOLLAR, '0' when none) plus the funding DOT it received as beneficiary, its total USD, and StateScan identity when available. totalUsd is the sum of the per-address totals and therefore always reconciles with byAddress; totalPaid.dot is the sum of the same funding referenda, so records without a usable amount or price are excluded from both.",
+        "Summarize Polkadot Secretary salary spending on Polkadot Collectives. Returns the total paid (totalPaid: salary split by asset — USDT/HOLLAR — plus interim funding in DOT), the combined USD total (totalUsd), and a per-address breakdown (byAddress) covering current members and all historical funding beneficiaries, with StateScan identity when available.",
       inputSchema: {},
       outputSchema: {
         totalPaid: salaryAmountSchema.describe(
