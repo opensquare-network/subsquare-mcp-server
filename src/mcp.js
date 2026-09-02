@@ -6,6 +6,7 @@ import {
   registerAddressVotesTools,
   registerFellowshipTools,
   registerReferendaTools,
+  registerSecretaryTools,
   registerTreasuryTools,
 } from "./tools/index.js";
 
@@ -33,6 +34,7 @@ export function createMcpServer() {
   registerAddressVotesTools(server);
   registerFellowshipTools(server);
   registerReferendaTools(server);
+  registerSecretaryTools(server);
   registerTreasuryTools(server);
   return server;
 }
