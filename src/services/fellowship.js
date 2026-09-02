@@ -15,6 +15,7 @@ import { getIdentity, getIdentityMap } from "./identity.js";
 import { formatAmount } from "../utils/amount.js";
 
 const FELLOWSHIP_MEMBERS_PATH = "fellowship/members";
+const FELLOWSHIP_FEEDS_PATH = "fellowship/feeds";
 const FELLOWSHIP_CORE_PARAMS_PATH = "fellowship/core/params";
 const SCAN_HEIGHT_PATH = "inspect/scan-height";
 const DEFAULT_FELLOWSHIP_SALARY_ASSET = Object.freeze({
@@ -220,6 +221,11 @@ export async function listFellowshipMembers() {
       blockHeight,
     ),
   );
+}
+
+export async function listFellowshipFeeds(query = {}) {
+  const { apiUrl } = getChainConfig(chains.collectives);
+  return request.get(new URL(FELLOWSHIP_FEEDS_PATH, apiUrl), query);
 }
 
 export async function getFellowshipMemberDetail({

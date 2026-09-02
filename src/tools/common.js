@@ -16,6 +16,17 @@ export const pageSize = z
   .optional()
   .describe("Items per page (default 10)");
 
+export const paginationInputShape = {
+  page,
+  page_size: pageSize,
+};
+
+export const accountAddress = z
+  .string()
+  .trim()
+  .min(1)
+  .describe("Non-empty account address");
+
 // The SubSquare API accepts booleans as either JSON booleans or the
 // strings "1", "true", "TRUE"
 export const flagValue = z.union([z.boolean(), z.enum(["1", "true", "TRUE"])]);

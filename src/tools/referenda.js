@@ -7,8 +7,7 @@ import {
 import {
   chain,
   createJsonResult,
-  page,
-  pageSize,
+  paginationInputShape,
   readOnlyAnnotations,
   simple,
 } from "./common.js";
@@ -32,8 +31,7 @@ const referendaStates = [
 
 const referendaListInputSchema = {
   chain,
-  page,
-  page_size: pageSize,
+  ...paginationInputShape,
   referendum_index: z
     .number()
     .int()
