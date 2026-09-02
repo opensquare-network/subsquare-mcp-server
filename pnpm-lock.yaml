@@ -29,6 +29,9 @@ importers:
       lru-cache:
         specifier: ^11.5.2
         version: 11.5.2
+      p-limit:
+        specifier: ^7.3.2
+        version: 7.3.2
       undici:
         specifier: ^6.28.0
         version: 6.28.0
@@ -1118,6 +1121,10 @@ packages:
     resolution: {integrity: sha512-YgBpdJHPyQ2UE5x+hlSXcnejzAvD0b22U2OuAP+8OnlJT+PjWPxtgmGqKKc+RgTM63U9gN0YzrYc71R2WT/hTA==}
     engines: {node: '>=18'}
 
+  p-limit@7.3.2:
+    resolution: {integrity: sha512-Ll0w3fU24vYpXoZmjjZIee6bJQDgG0oAyo1PdmFYI8UDwJJddaHAypxIH9avUu+t+lSsAwKVsb1jDCMIIChliw==}
+    engines: {node: '>=20'}
+
   parseurl@1.3.3:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
     engines: {node: '>= 0.8'}
@@ -1444,6 +1451,10 @@ packages:
   yn@3.1.1:
     resolution: {integrity: sha512-Ux4ygGWsu2c7isFWe8Yu1YluJmqVhxqK2cLXNQA5AcC3QfbGNpM7fu0Y8b/z16pXLnFxZYvWhd3fhBY9DLmC6Q==}
     engines: {node: '>=6'}
+
+  yocto-queue@1.2.2:
+    resolution: {integrity: sha512-4LCcse/U2MHZ63HAJVE+v71o7yOdIe4cZ70Wpf8D/IyjDKYQLV5GD46B+hSTjJsvV5PztjvHoU580EftxjDZFQ==}
+    engines: {node: '>=12.20'}
 
   zod-to-json-schema@3.25.2:
     resolution: {integrity: sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==}
@@ -2452,6 +2463,10 @@ snapshots:
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
 
+  p-limit@7.3.2:
+    dependencies:
+      yocto-queue: 1.2.2
+
   parseurl@1.3.3: {}
 
   path-is-inside@1.0.2: {}
@@ -2774,6 +2789,8 @@ snapshots:
       yargs-parser: 21.1.1
 
   yn@3.1.1: {}
+
+  yocto-queue@1.2.2: {}
 
   zod-to-json-schema@3.25.2(zod@3.25.76):
     dependencies:

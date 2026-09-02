@@ -1,4 +1,5 @@
 import pick from "lodash/pick.js";
+import pLimit from "p-limit";
 import { getTreasuryProjectItemDetail } from "../api.js";
 import { calculateTreasuryItemFiat } from "./amounts.js";
 
@@ -41,6 +42,8 @@ const PROJECT_ITEM_DETAIL_FIELDS = [
   "onchainData.isFinal",
 ];
 const POLKADOT_SUBSQUARE_URL = "https://polkadot.subsquare.io/";
+const PROJECT_DETAIL_REQUEST_CONCURRENCY = 6;
+const limitProjectDetailRequests = pLimit(PROJECT_DETAIL_REQUEST_CONCURRENCY);
 
 const projectItemTypes = Object.freeze(
   [
@@ -158,7 +161,8 @@ export async function fetchProjectDetails(project) {
       const items = await Promise.all(
         relations.map(async (relation) => {
           const id = getProjectItemId(itemType, relation);
-          const detail = await getTreasuryProjectItemDetail(
+          const detail = await limitProjectDetailRequests(
+            getTreasuryProjectItemDetail,
             itemType.detailPath,
             id,
           );
