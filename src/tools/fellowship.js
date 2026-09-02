@@ -9,9 +9,11 @@ import {
   createStructuredJsonResult,
   page,
   pageSize,
+  paginatedItemsSchema,
   paginationInputShape,
   readOnlyAnnotations,
 } from "./common.js";
+import { registerFellowshipTreasuryTools } from "./fellowship/treasury.js";
 
 const rankInfoSchema = z.object({
   activeSalary: z
@@ -71,6 +73,13 @@ const fellowshipMemberSchema = z.object({
   identity: identitySchema,
 });
 
+const fellowshipPaginationInputShape = {
+  page: page.default(1).describe("Page number, starts at 1 (default 1)"),
+  page_size: pageSize
+    .default(25)
+    .describe("Items per page (default 25, matching the Fellowship pages)"),
+};
+
 const memberStatisticsSchema = z.object({
   cycles: z
     .number()
@@ -117,27 +126,6 @@ const rankRecordSchema = z.object({
     ),
 });
 
-const paginatedItemsSchema = z.object({
-  items: z
-    .array(z.object({}).passthrough())
-    .describe("Paginated records; fields vary by endpoint and event"),
-  page: z
-    .number()
-    .int()
-    .positive()
-    .describe("Page number returned by Subsquare"),
-  pageSize: z
-    .number()
-    .int()
-    .positive()
-    .describe("Page size returned by Subsquare"),
-  total: z
-    .number()
-    .int()
-    .nonnegative()
-    .describe("Total number of matching records"),
-});
-
 const fellowshipMemberDetailOutputSchema = {
   member: fellowshipMemberSchema
     .nullable()
@@ -171,12 +159,7 @@ export function registerFellowshipTools(server) {
       description:
         "Browse the chronological Polkadot Technical Fellowship activity feed shown at /fellowship/feeds. Returns membership, salary, and Fellowship referenda events with their event-specific arguments and block metadata. Supports the same section, exact event, address, and pagination filters as the page; page defaults to 1 and page_size to 25.",
       inputSchema: {
-        page: page
-          .default(1)
-          .describe("Page number, starts at 1 (default 1)"),
-        page_size: pageSize
-          .default(25)
-          .describe("Items per page (default 25, matching /fellowship/feeds)"),
+        ...fellowshipPaginationInputShape,
         section: z
           .enum([
             "fellowshipCore",
@@ -207,6 +190,8 @@ export function registerFellowshipTools(server) {
       return createStructuredJsonResult(result);
     },
   );
+
+  registerFellowshipTreasuryTools(server);
 
   server.registerTool(
     "fellowship_list_members",

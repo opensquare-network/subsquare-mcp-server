@@ -21,6 +21,27 @@ export const paginationInputShape = {
   page_size: pageSize,
 };
 
+export const paginatedItemsSchema = z.object({
+  items: z
+    .array(z.object({}).passthrough())
+    .describe("Paginated records; fields vary by endpoint"),
+  page: z
+    .number()
+    .int()
+    .positive()
+    .describe("Page number returned by SubSquare"),
+  pageSize: z
+    .number()
+    .int()
+    .positive()
+    .describe("Page size returned by SubSquare"),
+  total: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe("Total number of matching records"),
+});
+
 export const accountAddress = z
   .string()
   .trim()
