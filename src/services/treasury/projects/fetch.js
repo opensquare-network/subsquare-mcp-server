@@ -1,5 +1,7 @@
 import pick from "lodash/pick.js";
 import pLimit from "p-limit";
+import { chains } from "../../../config/chain.js";
+import { getChainConfig } from "../../../config/chains.js";
 import { getTreasuryProjectItemDetail } from "../api.js";
 import { calculateTreasuryItemFiat } from "./amounts.js";
 
@@ -41,7 +43,6 @@ const PROJECT_ITEM_DETAIL_FIELDS = [
   "dValue",
   "onchainData.isFinal",
 ];
-const POLKADOT_SUBSQUARE_URL = "https://polkadot.subsquare.io/";
 const PROJECT_DETAIL_REQUEST_CONCURRENCY = 6;
 const limitProjectDetailRequests = pLimit(PROJECT_DETAIL_REQUEST_CONCURRENCY);
 
@@ -132,7 +133,7 @@ function getProjectItemId(itemType, relation) {
 function createProjectItemUrl(itemType, id) {
   return new URL(
     itemType.detailPath + "/" + encodeURIComponent(id),
-    POLKADOT_SUBSQUARE_URL,
+    getChainConfig(chains.polkadot).siteUrl,
   ).toString();
 }
 

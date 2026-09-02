@@ -1,0 +1,110 @@
+import isNil from "lodash/isNil.js";
+import { chains } from "../../config/chain.js";
+import { getChainConfig } from "../../config/chains.js";
+import { formatAmount } from "../../utils/amount.js";
+import { request } from "../api.js";
+
+const FELLOWSHIP_TREASURY_SPENDS_PATH = "fellowship/treasury/spends";
+const OVERVIEW_SUMMARY_PATH = "overview/summary";
+const FELLOWSHIP_TREASURY_ASSET_DECIMALS = Object.freeze({
+  DOT: 10,
+  HOLLAR: 18,
+});
+
+function createCollectivesUrl(path) {
+  const { apiUrl } = getChainConfig(chains.collectives);
+  return new URL(path, apiUrl);
+}
+
+function createCollectivesSiteUrl(path) {
+  const { siteUrl } = getChainConfig(chains.collectives);
+  return new URL(path, siteUrl);
+}
+
+function getFellowshipTreasuryExtracted(spend) {
+  return spend?.extracted ?? spend?.onchainData?.extracted;
+}
+
+function formatFellowshipTreasuryAmount(extracted) {
+  const rawAmount = extracted?.amount;
+  const symbol = extracted?.assetKind?.symbol?.toUpperCase();
+  const decimals = FELLOWSHIP_TREASURY_ASSET_DECIMALS[symbol];
+
+  if (isNil(rawAmount) || isNil(decimals)) {
+    return null;
+  }
+
+  return `${formatAmount(rawAmount, decimals)} ${symbol}`;
+}
+
+function createFellowshipTreasurySpend(spend) {
+  return {
+    index: spend.index,
+    title: spend.title,
+    state: spend.state,
+    amount: formatFellowshipTreasuryAmount(
+      getFellowshipTreasuryExtracted(spend),
+    ),
+    url: createCollectivesSiteUrl(
+      `${FELLOWSHIP_TREASURY_SPENDS_PATH}/${spend.index}`,
+    ).toString(),
+  };
+}
+
+function createFellowshipTreasurySpendDetail(spend) {
+  const extracted = getFellowshipTreasuryExtracted(spend);
+
+  return {
+    ...createFellowshipTreasurySpend(spend),
+    beneficiary: extracted?.beneficiary?.address ?? null,
+    referendumIndex: spend.referendumIndex ?? null,
+    content: spend.content ?? null,
+  };
+}
+
+function createFellowshipTreasuryPage(response) {
+  return {
+    page: response.page,
+    pageSize: response.pageSize,
+    total: response.total,
+    items: response.items.map(createFellowshipTreasurySpend),
+  };
+}
+
+export async function getFellowshipTreasuryStatus() {
+  const {
+    fellowshipTreasurySpends: { active, all: total },
+  } = await request.get(createCollectivesUrl(OVERVIEW_SUMMARY_PATH));
+
+  return {
+    active,
+    total,
+  };
+}
+
+export async function listFellowshipTreasurySpends(query = {}) {
+  const response = await request.get(
+    createCollectivesUrl(FELLOWSHIP_TREASURY_SPENDS_PATH),
+    {
+      ...query,
+      simple: true,
+    },
+  );
+
+  return createFellowshipTreasuryPage(response);
+}
+
+export async function getFellowshipTreasurySpend({ spend_index } = {}) {
+  if (!Number.isInteger(spend_index) || spend_index < 0) {
+    throw new Error(
+      "Fellowship Treasury spend_index must be a non-negative integer",
+    );
+  }
+
+  const spend = await request.get(
+    createCollectivesUrl(
+      `${FELLOWSHIP_TREASURY_SPENDS_PATH}/${spend_index}`,
+    ),
+  );
+  return createFellowshipTreasurySpendDetail(spend);
+}

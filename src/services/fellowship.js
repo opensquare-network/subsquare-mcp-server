@@ -15,6 +15,7 @@ import { getIdentity, getIdentityMap } from "./identity.js";
 import { formatAmount } from "../utils/amount.js";
 
 const FELLOWSHIP_MEMBERS_PATH = "fellowship/members";
+const FELLOWSHIP_FEEDS_PATH = "fellowship/feeds";
 const FELLOWSHIP_CORE_PARAMS_PATH = "fellowship/core/params";
 const SCAN_HEIGHT_PATH = "inspect/scan-height";
 const DEFAULT_FELLOWSHIP_SALARY_ASSET = Object.freeze({
@@ -77,6 +78,8 @@ const VOTE_FIELDS = [
   "proposal.state.name",
 ];
 const RANK_RECORD_FIELDS = ["time", "rank", "event"];
+const FEED_INDEXER_FIELDS = ["blockHeight", "blockTime"];
+const FEED_MEMBER_INFO_FIELDS = ["rank", "isActive"];
 
 function getFellowshipSalaryAsset(blockHeight) {
   if (
@@ -122,6 +125,48 @@ function pickHistoryPage(history, fields) {
     ...pick(history, HISTORY_PAGE_FIELDS),
     items: Array.isArray(history?.items)
       ? history.items.map((item) => pick(item, fields))
+      : [],
+  };
+}
+
+// Feeds carry event-specific args, so keep args whole and only trim the
+// bulky, rarely needed parts: raw hex salary payloads and indexer hashes.
+function compactFeedArgs(args) {
+  if (!args || typeof args !== "object") {
+    return args;
+  }
+
+  return {
+    ...args,
+    memberInfo: args.memberInfo
+      ? pick(args.memberInfo, FEED_MEMBER_INFO_FIELDS)
+      : undefined,
+  };
+}
+
+function compactFeedItem(item) {
+  const indexer = pick(item?.indexer, FEED_INDEXER_FIELDS);
+
+  return {
+    section: item.section,
+    index: item.index,
+    event: item.event,
+    args: compactFeedArgs(item.args),
+    indexer: Object.keys(indexer).length ? indexer : undefined,
+  };
+}
+
+export async function listFellowshipFeeds(query = {}) {
+  const { apiUrl } = getChainConfig(chains.collectives);
+  const feeds = await request.get(
+    new URL(FELLOWSHIP_FEEDS_PATH, apiUrl),
+    query,
+  );
+
+  return {
+    ...pick(feeds, HISTORY_PAGE_FIELDS),
+    items: Array.isArray(feeds?.items)
+      ? feeds.items.map(compactFeedItem)
       : [],
   };
 }

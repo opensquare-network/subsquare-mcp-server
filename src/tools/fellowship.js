@@ -1,24 +1,30 @@
 import { z } from "zod";
 import {
   getFellowshipMemberDetail,
+  listFellowshipFeeds,
   listFellowshipMembers,
 } from "../services/fellowship.js";
 import {
+  accountAddress,
   createStructuredJsonResult,
-  page,
-  pageSize,
+  paginatedItemsSchema,
+  paginationInputShape,
   readOnlyAnnotations,
 } from "./common.js";
+import { registerFellowshipStatisticsTools } from "./fellowship/statistics.js";
+import { registerFellowshipTreasuryTools } from "./fellowship/treasury.js";
 
 const rankInfoSchema = z.object({
   activeSalary: z
     .string()
+    .min(0)
     .nullable()
     .describe(
       "Human-readable active salary with its asset symbol, such as '16666.666666 HOLLAR'",
     ),
   passiveSalary: z
     .string()
+    .min(0)
     .nullable()
     .describe(
       "Human-readable passive salary with its asset symbol, such as '8333.333333 HOLLAR'",
@@ -104,6 +110,7 @@ const memberStatisticsSchema = z.object({
 const rankRecordSchema = z.object({
   time: z
     .number()
+    .finite()
     .nullable()
     .describe("Block timestamp in milliseconds, when available"),
   rank: z.number().int().nonnegative().describe("Member rank after the event"),
@@ -114,43 +121,22 @@ const rankRecordSchema = z.object({
     ),
 });
 
-const historyPageSchema = z.object({
-  items: z
-    .array(z.object({}).passthrough())
-    .describe("Selected compact records; fields vary by history section"),
-  page: z
-    .number()
-    .int()
-    .positive()
-    .describe("Page number returned by Subsquare"),
-  pageSize: z
-    .number()
-    .int()
-    .positive()
-    .describe("Page size returned by Subsquare"),
-  total: z
-    .number()
-    .int()
-    .nonnegative()
-    .describe("Total number of matching records"),
-});
-
 const fellowshipMemberDetailOutputSchema = {
   member: fellowshipMemberSchema
     .nullable()
     .describe(
       "Current Fellowship member or rank-0 candidate profile, or null when the address is not in the current roster.",
     ),
-  evidenceHistory: historyPageSchema.describe(
+  evidenceHistory: paginatedItemsSchema.describe(
     "Selected compact Fellowship evidence records. CID, title, rank, wish, status, related referendum summaries, and selected block metadata are retained; markdown content and raw payloads are omitted.",
   ),
-  salaryClaimHistory: historyPageSchema.describe(
+  salaryClaimHistory: paginatedItemsSchema.describe(
     "Selected compact Fellowship salary records. The cycle index, salary and amount as returned by the API, registration/payment status, beneficiary, historical rank, and block metadata are retained.",
   ),
-  referendaSubmissionHistory: historyPageSchema.describe(
+  referendaSubmissionHistory: paginatedItemsSchema.describe(
     "Selected compact Fellowship referenda submitted by the address. Index, title/summary, track, proposer, activity timestamps, comment count, and state are retained; on-chain call payloads are omitted.",
   ),
-  voteHistory: historyPageSchema.describe(
+  voteHistory: paginatedItemsSchema.describe(
     "Selected compact Fellowship vote records with referendum index, account, aye/nay direction, vote value, query block, title, and state.",
   ),
   statistics: memberStatisticsSchema.describe(
@@ -163,10 +149,47 @@ const fellowshipMemberDetailOutputSchema = {
 
 export function registerFellowshipTools(server) {
   server.registerTool(
+    "fellowship_list_feeds",
+    {
+      description:
+        "Browse the chronological Polkadot Technical Fellowship activity feed, with section, exact event, address, and pagination filters.",
+      inputSchema: {
+        ...paginationInputShape,
+        section: z
+          .enum(["fellowshipCore", "fellowshipSalary", "fellowshipReferenda"])
+          .optional()
+          .describe(
+            "Filter by fellowshipCore (membership), fellowshipSalary (salary), or fellowshipReferenda (referenda); omit for all sections",
+          ),
+        event: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            "Exact PascalCase event name, such as Promoted, Voted, Paid, or DecisionStarted; omit for every event",
+          ),
+        who: accountAddress
+          .optional()
+          .describe("Filter events by the participant's SS58 address"),
+      },
+      outputSchema: paginatedItemsSchema.shape,
+      annotations: readOnlyAnnotations,
+    },
+    async (args) => {
+      const result = await listFellowshipFeeds(args);
+      return createStructuredJsonResult(result);
+    },
+  );
+
+  registerFellowshipTreasuryTools(server);
+  registerFellowshipStatisticsTools(server);
+
+  server.registerTool(
     "fellowship_list_members",
     {
       description:
-        "List the current Polkadot Technical Fellowship roster on Polkadot Collectives, including rank-0 candidates. Each record provides an SS58 address, rank (0 denotes a candidate), derived rank parameters, and StateScan identity when available.",
+        "List the current Polkadot Technical Fellowship roster on Polkadot Collectives, including rank-0 candidates.",
       inputSchema: {},
       outputSchema: {
         members: z.array(fellowshipMemberSchema),
@@ -183,17 +206,12 @@ export function registerFellowshipTools(server) {
     "fellowship_get_member_detail",
     {
       description:
-        "Get a current Fellowship member or rank-0 candidate profile, four paginated activity histories, and salary/rank statistics for an SS58 address on Polkadot Collectives. Histories use selected compact fields: evidence markdown/raw payloads and referendum call payloads are omitted. One page and page_size apply to evidence, salary claims, submitted referenda, and votes; rankRecords is unpaginated. Identity is included when available, and member is null when the address is not in the current roster.",
+        "Get a current Fellowship member or rank-0 candidate profile with four compact activity histories (evidence, salary claims, submitted referenda, votes) and salary/rank statistics for an SS58 address; rankRecords is unpaginated.",
       inputSchema: {
-        address: z
-          .string()
-          .trim()
-          .min(1)
-          .describe(
-            "SS58 address whose current or historical Fellowship activity to look up",
-          ),
-        page,
-        page_size: pageSize,
+        address: accountAddress.describe(
+          "SS58 address whose current or historical Fellowship activity to look up",
+        ),
+        ...paginationInputShape,
       },
       outputSchema: fellowshipMemberDetailOutputSchema,
       annotations: readOnlyAnnotations,

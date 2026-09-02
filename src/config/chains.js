@@ -20,14 +20,26 @@ const chainApiEndpoints = {
   [chains.hydration]: "https://hydration-api.subsquare.io",
 };
 
-function getApiUrlByChain(chain) {
-  const url = chainApiEndpoints[chain];
-  if (!url) {
-    throw new Error(`${chain} is not configured`);
-  }
+const chainSiteEndpoints = {
+  [chains.polkadot]: "https://polkadot.subsquare.io",
+  [chains.kusama]: "https://kusama.subsquare.io",
+  [chains.collectives]: "https://collectives.subsquare.io",
+  [chains.hydration]: "https://hydration.subsquare.io",
+};
 
-  return url;
+function getEndpointByChain(endpoints) {
+  return (chain) => {
+    const url = endpoints[chain];
+    if (!url) {
+      throw new Error(`${chain} is not configured`);
+    }
+
+    return url;
+  };
 }
+
+const getApiUrlByChain = getEndpointByChain(chainApiEndpoints);
+const getSiteUrlByChain = getEndpointByChain(chainSiteEndpoints);
 
 function requireEnv(name) {
   const value = process.env[name]?.trim();
@@ -41,6 +53,7 @@ function requireEnv(name) {
 export function getChainConfig(chain) {
   return {
     apiUrl: getApiUrlByChain(chain),
+    siteUrl: getSiteUrlByChain(chain),
     referendaPath: isCollectivesChain(chain)
       ? COLLECTIVES_REFERENDA_PATH
       : DEFAULT_REFERENDA_PATH,

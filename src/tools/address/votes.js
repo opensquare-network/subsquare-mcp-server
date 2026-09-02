@@ -35,7 +35,7 @@ export function registerAddressVotesTools(server) {
     "opengov_list_votes_by_address",
     {
       description:
-        "Find all OpenGov referendum votes cast by a given address on a configured chain (Polkadot, Kusama, or Hydration). Use it to inspect an account's voting history, optionally filtered by vote type and enriched with the referendum title and state.",
+        "List OpenGov referendum votes cast by an address on a configured chain.",
       inputSchema: {
         chain: opengovChains,
         address: z.string().describe("SS58 address whose votes to look up"),
@@ -56,7 +56,7 @@ export function registerAddressVotesTools(server) {
     "fellowship_list_votes_by_address",
     {
       description:
-        "Find all Fellowship referendum votes cast by a given address on the Polkadot Collectives chain. Use it to inspect an account's fellowship voting history, optionally filtered by vote type and enriched with the referendum title and state.",
+        "List Fellowship referendum votes cast by an address on Polkadot Collectives.",
       inputSchema: {
         address: z.string().describe("SS58 address whose votes to look up"),
         page,

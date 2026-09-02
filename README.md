@@ -4,7 +4,12 @@
 
 ```
 pnpm start
-pnpm run inspect
+```
+
+Debug with the MCP inspector
+
+```
+npx --yes @modelcontextprotocol/inspector@latest
 ```
 
 ## Install

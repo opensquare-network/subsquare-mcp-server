@@ -5,16 +5,48 @@ export const page = z
   .number()
   .int()
   .positive()
-  .optional()
-  .describe("Page number, starts at 1");
+  .default(1)
+  .describe("Page number, starts at 1 (default 1)");
 
 export const pageSize = z
   .number()
   .int()
   .positive()
   .max(100)
-  .optional()
-  .describe("Items per page (default 10)");
+  .default(25)
+  .describe("Items per page (default 25)");
+
+export const paginationInputShape = {
+  page,
+  page_size: pageSize,
+};
+
+export const paginatedItemsSchema = z.object({
+  items: z
+    .array(z.object({}).passthrough())
+    .describe("Paginated records; fields vary by endpoint"),
+  page: z
+    .number()
+    .int()
+    .positive()
+    .describe("Page number returned by SubSquare"),
+  pageSize: z
+    .number()
+    .int()
+    .positive()
+    .describe("Page size returned by SubSquare"),
+  total: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe("Total number of matching records"),
+});
+
+export const accountAddress = z
+  .string()
+  .trim()
+  .min(1)
+  .describe("Non-empty account address");
 
 // The SubSquare API accepts booleans as either JSON booleans or the
 // strings "1", "true", "TRUE"
