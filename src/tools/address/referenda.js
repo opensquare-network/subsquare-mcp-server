@@ -22,7 +22,7 @@ export function registerAddressReferendaTools(server) {
     "opengov_list_referenda_by_address",
     {
       description:
-        "Find all OpenGov referenda (governance proposals) created by a given address on a configured chain (Polkadot, Kusama, or Hydration). Use it to inspect the proposal history of a specific account, with paginated and optionally simplified results.",
+        "List OpenGov referenda created by an address on a configured chain.",
       inputSchema: {
         chain: opengovChains,
         address: z.string().describe("SS58 address that proposed the referenda"),

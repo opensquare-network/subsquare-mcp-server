@@ -151,7 +151,7 @@ export function registerFellowshipTools(server) {
     "fellowship_list_feeds",
     {
       description:
-        "Browse the chronological Polkadot Technical Fellowship activity feed shown at /fellowship/feeds. Returns membership, salary, and Fellowship referenda events with their event-specific arguments and block metadata. Supports the same section, exact event, address, and pagination filters as the page; page defaults to 1 and page_size to 25.",
+        "Browse the chronological Polkadot Technical Fellowship activity feed, with section, exact event, address, and pagination filters.",
       inputSchema: {
         ...paginationInputShape,
         section: z
@@ -191,7 +191,7 @@ export function registerFellowshipTools(server) {
     "fellowship_list_members",
     {
       description:
-        "List the current Polkadot Technical Fellowship roster on Polkadot Collectives, including rank-0 candidates. Each record provides an SS58 address, rank (0 denotes a candidate), derived rank parameters, and StateScan identity when available.",
+        "List the current Polkadot Technical Fellowship roster on Polkadot Collectives, including rank-0 candidates.",
       inputSchema: {},
       outputSchema: {
         members: z.array(fellowshipMemberSchema),
@@ -208,7 +208,7 @@ export function registerFellowshipTools(server) {
     "fellowship_get_member_detail",
     {
       description:
-        "Get a current Fellowship member or rank-0 candidate profile, four paginated activity histories, and salary/rank statistics for an SS58 address on Polkadot Collectives. Histories use selected compact fields: evidence markdown/raw payloads and referendum call payloads are omitted. One page and page_size apply to evidence, salary claims, submitted referenda, and votes; rankRecords is unpaginated. Identity is included when available, and member is null when the address is not in the current roster.",
+        "Get a current Fellowship member or rank-0 candidate profile with four compact activity histories (evidence, salary claims, submitted referenda, votes) and salary/rank statistics for an SS58 address; rankRecords is unpaginated.",
       inputSchema: {
         address: accountAddress.describe(
           "SS58 address whose current or historical Fellowship activity to look up",

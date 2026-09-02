@@ -16,6 +16,11 @@ function createCollectivesUrl(path) {
   return new URL(path, apiUrl);
 }
 
+function createCollectivesSiteUrl(path) {
+  const { siteUrl } = getChainConfig(chains.collectives);
+  return new URL(path, siteUrl);
+}
+
 function getFellowshipTreasuryExtracted(spend) {
   return spend?.extracted ?? spend?.onchainData?.extracted;
 }
@@ -40,6 +45,9 @@ function createFellowshipTreasurySpend(spend) {
     amount: formatFellowshipTreasuryAmount(
       getFellowshipTreasuryExtracted(spend),
     ),
+    url: createCollectivesSiteUrl(
+      `${FELLOWSHIP_TREASURY_SPENDS_PATH}/${spend.index}`,
+    ).toString(),
   };
 }
 

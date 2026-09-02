@@ -31,7 +31,7 @@ export function registerIdentityTools(server) {
     "identity_get_identities",
     {
       description:
-        "Batch-query StateScan identities for a list of SS58 addresses on a supported chain (Polkadot, Kusama, Hydration, or Collectives; Collectives resolves identities on Polkadot). Returns the display name and verification status for every address that has a registered identity in one call, so feed or referendum participants can be annotated without fetching per-address details.",
+        "Batch-query StateScan identities (display name and verification status) for a list of addresses on a supported chain.",
       inputSchema: {
         chain: chain.describe(
           "Chain whose identity registry should be queried",

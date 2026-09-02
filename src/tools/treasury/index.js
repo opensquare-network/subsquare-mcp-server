@@ -78,7 +78,7 @@ export function registerTreasuryTools(server) {
     "treasury_list_projects",
     {
       description:
-        "List every Polkadot Treasury project with compact metadata: ID, name, category, description, links, reported aggregate USD values, and proposal count. No linked proposal, spend, tip, bounty, or other detail requests are made. Use treasury_get_project_detail with a selected project_id to retrieve that project's linked record details.",
+        "List every Polkadot Treasury project with compact metadata.",
       inputSchema: {},
       annotations: readOnlyAnnotations,
     },
@@ -94,7 +94,7 @@ export function registerTreasuryTools(server) {
     "treasury_get_status",
     {
       description:
-        "Summarize current Treasury activity for Polkadot or Kusama. Returns active and total counts for proposals, spends, bounties, child bounties, multi-asset bounties, and multi-asset child bounties.",
+        "Summarize current Treasury activity for Polkadot or Kusama with active and total counts.",
       inputSchema: treasuryStatusInputSchema,
       annotations: readOnlyAnnotations,
     },
@@ -108,7 +108,7 @@ export function registerTreasuryTools(server) {
     "treasury_get_balances",
     {
       description:
-        "Retrieve current treasury balances for one supported chain or all supported chains. Results include chain totals and available asset balances, decimals, prices, and update times.",
+        "Retrieve current treasury balances for one chain or all supported chains.",
       inputSchema: treasuryBalancesInputSchema,
       outputSchema: treasuryBalancesOutputSchema,
       annotations: readOnlyAnnotations,

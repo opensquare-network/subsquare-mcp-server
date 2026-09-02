@@ -27,6 +27,9 @@ const fellowshipTreasurySpendSchema = z.object({
     .describe(
       "Human-readable requested amount with asset symbol; null when the asset is unavailable or unsupported",
     ),
+  url: z
+    .string()
+    .describe("Direct Subsquare URL for the spend detail page"),
 });
 
 const fellowshipTreasurySpendDetailSchema = fellowshipTreasurySpendSchema.extend(
@@ -54,8 +57,7 @@ export function registerFellowshipTreasuryTools(server) {
   server.registerTool(
     "fellowship_treasury_get_status",
     {
-      description:
-        "Get compact Polkadot Fellowship Treasury spend counts from the Collectives SubSquare API. Returns active and total indexed spends only; it does not return the on-chain treasury balance, requesting amount, or to-be-awarded amount.",
+      description: "Get compact Fellowship Treasury spend counts (active and total indexed).",
       inputSchema: {},
       outputSchema: {
         active: z
@@ -81,7 +83,7 @@ export function registerFellowshipTreasuryTools(server) {
     "fellowship_treasury_list_spends",
     {
       description:
-        "List Fellowship Treasury spends indexed by SubSquare on Polkadot Collectives. Each item contains only its index, title, API-reported state, and human-readable requested amount. The service always requests simple=true. Use the returned spend index with fellowship_treasury_get_spend; page defaults to 1 and page_size to 25.",
+        "List Fellowship Treasury spends on Polkadot Collectives, each with its index, title, state, requested amount, and detail url.",
       inputSchema: paginationInputShape,
       outputSchema: paginatedItemsSchema
         .extend({
@@ -100,7 +102,7 @@ export function registerFellowshipTreasuryTools(server) {
     "fellowship_treasury_get_spend",
     {
       description:
-        "Get human-readable details for one Fellowship Treasury spend indexed by SubSquare on Polkadot Collectives. Supply the spend index returned by fellowship_treasury_list_spends, not its related referendum index. Returns its summary, beneficiary address, related referendum index, and markdown content; it excludes raw chain payloads, timeline, and block metadata.",
+        "Get one Fellowship Treasury spend's beneficiary, related referendum index, and markdown content by spend index.",
       inputSchema: {
         spend_index: z
           .number()

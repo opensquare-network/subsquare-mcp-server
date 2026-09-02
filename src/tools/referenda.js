@@ -66,7 +66,7 @@ export function registerReferendaTools(server) {
     "opengov_list_referenda",
     {
       description:
-        "Find and browse OpenGov referenda — on-chain governance proposals (Polkadot, Kusama, etc.) on a configured SubSquare chain. Use it to inspect referendum/proposal details, filter by status, Treasury relevance, or referendum index, and retrieve paginated results.",
+        "List and filter OpenGov referenda (on-chain governance proposals) on a configured chain.",
       inputSchema: referendaListInputSchema,
       annotations: readOnlyAnnotations,
     },
@@ -80,7 +80,7 @@ export function registerReferendaTools(server) {
     "opengov_referendum_detail",
     {
       description:
-        "Get the full details of a specific OpenGov referendum (governance proposal) on a configured SubSquare chain by its referendum index. Use it to inspect a single proposal's on-chain state, timeline, and metadata when you already know the index (e.g. from opengov_list_referenda).",
+        "Get the full details of one OpenGov referendum by its index.",
       inputSchema: {
         chain,
         referendum_index: z
@@ -101,7 +101,7 @@ export function registerReferendaTools(server) {
     "opengov_referenda_summary",
     {
       description:
-        "Summarize OpenGov referendum activity — an overview of Polkadot governance proposals (e.g. status counts on Polkadot, Kusama) on a configured SubSquare chain. Use it for aggregate counts and a quick overview before listing individual referenda.",
+        "Summarize OpenGov referendum activity (such as status counts) for a chain.",
       inputSchema: { chain },
       annotations: readOnlyAnnotations,
     },
