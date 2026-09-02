@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { getIdentityMap } from "../services/identity.js";
-import { accountAddress, chain, createStructuredJsonResult, readOnlyAnnotations } from "./common.js";
+import {
+  accountAddress,
+  chain,
+  createStructuredJsonResult,
+  readOnlyAnnotations,
+} from "./common.js";
 
 const identityOutputSchema = z.object({
   identities: z

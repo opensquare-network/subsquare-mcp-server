@@ -11,6 +11,7 @@ import {
   paginationInputShape,
   readOnlyAnnotations,
 } from "./common.js";
+import { registerFellowshipStatisticsTools } from "./fellowship/statistics.js";
 import { registerFellowshipTreasuryTools } from "./fellowship/treasury.js";
 
 const rankInfoSchema = z.object({
@@ -155,11 +156,7 @@ export function registerFellowshipTools(server) {
       inputSchema: {
         ...paginationInputShape,
         section: z
-          .enum([
-            "fellowshipCore",
-            "fellowshipSalary",
-            "fellowshipReferenda",
-          ])
+          .enum(["fellowshipCore", "fellowshipSalary", "fellowshipReferenda"])
           .optional()
           .describe(
             "Filter by fellowshipCore (membership), fellowshipSalary (salary), or fellowshipReferenda (referenda); omit for all sections",
@@ -186,6 +183,7 @@ export function registerFellowshipTools(server) {
   );
 
   registerFellowshipTreasuryTools(server);
+  registerFellowshipStatisticsTools(server);
 
   server.registerTool(
     "fellowship_list_members",
