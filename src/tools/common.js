@@ -5,16 +5,16 @@ export const page = z
   .number()
   .int()
   .positive()
-  .optional()
-  .describe("Page number, starts at 1");
+  .default(1)
+  .describe("Page number, starts at 1 (default 1)");
 
 export const pageSize = z
   .number()
   .int()
   .positive()
   .max(100)
-  .optional()
-  .describe("Items per page (default 10)");
+  .default(25)
+  .describe("Items per page (default 25)");
 
 export const paginationInputShape = {
   page,

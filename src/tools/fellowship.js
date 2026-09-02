@@ -7,8 +7,6 @@ import {
 import {
   accountAddress,
   createStructuredJsonResult,
-  page,
-  pageSize,
   paginatedItemsSchema,
   paginationInputShape,
   readOnlyAnnotations,
@@ -72,13 +70,6 @@ const fellowshipMemberSchema = z.object({
     .describe("Derived parameters for the reported rank"),
   identity: identitySchema,
 });
-
-const fellowshipPaginationInputShape = {
-  page: page.default(1).describe("Page number, starts at 1 (default 1)"),
-  page_size: pageSize
-    .default(25)
-    .describe("Items per page (default 25, matching the Fellowship pages)"),
-};
 
 const memberStatisticsSchema = z.object({
   cycles: z
@@ -159,7 +150,7 @@ export function registerFellowshipTools(server) {
       description:
         "Browse the chronological Polkadot Technical Fellowship activity feed shown at /fellowship/feeds. Returns membership, salary, and Fellowship referenda events with their event-specific arguments and block metadata. Supports the same section, exact event, address, and pagination filters as the page; page defaults to 1 and page_size to 25.",
       inputSchema: {
-        ...fellowshipPaginationInputShape,
+        ...paginationInputShape,
         section: z
           .enum([
             "fellowshipCore",

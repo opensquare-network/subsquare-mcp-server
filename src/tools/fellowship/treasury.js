@@ -6,18 +6,11 @@ import {
 } from "../../services/fellowship/treasury.js";
 import {
   createStructuredJsonResult,
-  page,
-  pageSize,
   paginatedItemsSchema,
+  paginationInputShape,
   readOnlyAnnotations,
 } from "../common.js";
 
-const fellowshipPaginationInputShape = {
-  page: page.default(1).describe("Page number, starts at 1 (default 1)"),
-  page_size: pageSize
-    .default(25)
-    .describe("Items per page (default 25, matching the Fellowship pages)"),
-};
 
 const fellowshipTreasurySpendSchema = z.object({
   index: z
@@ -83,7 +76,7 @@ export function registerFellowshipTreasuryTools(server) {
     {
       description:
         "List Fellowship Treasury spends indexed by SubSquare on Polkadot Collectives. Each item contains only its index, title, API-reported state, and human-readable requested amount. The service always requests simple=true. Use the returned spend index with fellowship_treasury_get_spend; page defaults to 1 and page_size to 25.",
-      inputSchema: fellowshipPaginationInputShape,
+      inputSchema: paginationInputShape,
       outputSchema: paginatedItemsSchema
         .extend({
           items: z.array(fellowshipTreasurySpendSchema),
