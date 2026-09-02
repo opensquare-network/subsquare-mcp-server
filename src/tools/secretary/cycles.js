@@ -3,8 +3,16 @@ import { listSecretarySalaryCycles } from "../../services/secretary/index.js";
 import { createStructuredJsonResult, readOnlyAnnotations } from "../common.js";
 
 const salaryAmountSchema = z.object({
-  usdt: z.string().describe("Amount in USDT, human-readable"),
-  hollar: z.string().describe("Amount in HOLLAR, human-readable"),
+  usdt: z
+    .string()
+    .describe(
+      "Cycle amount paid out in USDT, human-readable ('0' when the cycle paid in HOLLAR)",
+    ),
+  hollar: z
+    .string()
+    .describe(
+      "Cycle amount paid out in HOLLAR, human-readable ('0' when the cycle paid in USDT)",
+    ),
 });
 
 const secretarySalaryCycleSchema = z.object({

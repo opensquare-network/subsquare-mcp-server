@@ -4,12 +4,20 @@ import { createStructuredJsonResult, readOnlyAnnotations } from "../common.js";
 import { identitySchema } from "./common.js";
 
 const salaryAmountSchema = z.object({
-  usdt: z.string().describe("Amount in USDT, human-readable"),
-  hollar: z.string().describe("Amount in HOLLAR, human-readable"),
+  usdt: z
+    .string()
+    .describe(
+      "Salary amount paid out in USDT, human-readable ('0' when none of the salary was paid in USDT)",
+    ),
+  hollar: z
+    .string()
+    .describe(
+      "Salary amount paid out in HOLLAR, human-readable ('0' when none of the salary was paid in HOLLAR)",
+    ),
   dot: z
     .string()
     .describe(
-      "Amount in DOT from interim funding received via payment referenda, human-readable; '0' when there is none",
+      "Interim funding amount paid out in DOT via payment referenda, human-readable; '0' when there is none",
     ),
 });
 
