@@ -38,13 +38,6 @@ function scaleAmount(value, decimals) {
   return amount.div(new BigNumber(10).pow(decimals));
 }
 
-function getPolkadotTreasuryAsset(symbol) {
-  return (
-    getAsset(chains.polkadot, symbol) ??
-    getAsset(chains.polkadotAssetHub, symbol)
-  );
-}
-
 function calculatePriceFiat(value, price) {
   const submissionPrice = asBigNumber(price?.submission);
   const finalPrice = asBigNumber(price?.final ?? price?.current);
@@ -68,12 +61,12 @@ function calculateSpendFiat(detail) {
 
   if (assetKind?.type === "native") {
     return calculatePriceFiat(
-      scaleAmount(amount, getPolkadotTreasuryAsset("DOT").decimals),
+      scaleAmount(amount, getAsset(chains.polkadotAssetHub, "DOT").decimals),
       detail.onchainData?.price,
     );
   }
 
-  const asset = getPolkadotTreasuryAsset(symbol);
+  const asset = getAsset(chains.polkadotAssetHub, symbol);
   if (asset == null) {
     return { submission: new BigNumber(0), final: new BigNumber(0) };
   }
@@ -155,10 +148,10 @@ function getMultiAssetSymbol(assetKind) {
 function calculateMultiAssetBountyFiat(detail) {
   const { assetKind, price, value } = detail.onchainData ?? {};
   const symbol = getMultiAssetSymbol(assetKind) ?? "DOT";
-  const asset = getPolkadotTreasuryAsset(symbol);
+  const asset = getAsset(chains.polkadotAssetHub, symbol);
   const amount = scaleAmount(
     value,
-    asset?.decimals ?? getPolkadotTreasuryAsset("DOT").decimals,
+    asset?.decimals ?? getAsset(chains.polkadotAssetHub, "DOT").decimals,
   );
 
   if (STABLECOIN_SYMBOLS.has(symbol)) {

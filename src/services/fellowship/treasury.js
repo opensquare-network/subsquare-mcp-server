@@ -94,18 +94,15 @@ export async function getFellowshipTreasuryBalance() {
       FELLOWSHIP_TREASURY_ACCOUNT,
     ),
   ]);
-  const rawBalances = {
-    dot: account?.data.free.toString() ?? "0",
-    hollar: hollarAccount?.balance.toString() ?? "0",
-  };
+  const dotBalance = account?.data.free.toString() ?? "0";
+  const hollarBalance = hollarAccount?.balance.toString() ?? "0";
 
   return {
     account: FELLOWSHIP_TREASURY_ACCOUNT,
     balances: {
-      dot: formatAmount(rawBalances.dot, dot.decimals),
-      hollar: formatAmount(rawBalances.hollar, hollarAsset.decimals),
+      dot: formatAmount(dotBalance, dot.decimals),
+      hollar: formatAmount(hollarBalance, hollarAsset.decimals),
     },
-    rawBalances,
   };
 }
 
