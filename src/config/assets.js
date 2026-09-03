@@ -25,6 +25,9 @@ const polkadotAssetHubAssets = Object.freeze([
     decimals: 18,
   },
 ]);
+const hydrationAssets = Object.freeze([
+  { symbol: "HOLLAR", assetId: 222, decimals: 18 },
+]);
 const kusamaAssets = Object.freeze([
   { symbol: "KSM", assetId: null, decimals: 12 },
 ]);
@@ -36,6 +39,7 @@ function getAssets(chain) {
   if (chain === chains.polkadot) return polkadotAssets;
   if (chain === chains.collectives) return collectivesAssets;
   if (chain === chains.polkadotAssetHub) return polkadotAssetHubAssets;
+  if (chain === chains.hydration) return hydrationAssets;
   if (chain === chains.kusama) return kusamaAssets;
   if (chain === chains.kusamaAssetHub) return kusamaAssetHubAssets;
 

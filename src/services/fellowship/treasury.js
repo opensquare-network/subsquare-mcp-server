@@ -85,23 +85,32 @@ export async function getFellowshipTreasuryStatus() {
 export async function getFellowshipTreasuryBalance() {
   const assetHubChain = chains.polkadotAssetHub;
   const dot = getAsset(assetHubChain, "DOT");
-  const hollarAsset = getAsset(assetHubChain, "HOLLAR");
-  const api = getTypedApi(assetHubChain);
-  const [account, hollarAccount] = await Promise.all([
-    api.query.System.Account.getValue(FELLOWSHIP_TREASURY_ACCOUNT),
-    api.query.ForeignAssets.Account.getValue(
-      hollarAsset.assetId,
-      FELLOWSHIP_TREASURY_ACCOUNT,
-    ),
-  ]);
+  const assetHubHollarAsset = getAsset(assetHubChain, "HOLLAR");
+  const hydrationHollarAsset = getAsset(chains.hydration, "HOLLAR");
+  const assetHubApi = getTypedApi(assetHubChain);
+  const hydrationApi = getTypedApi(chains.hydration);
+  const [account, assetHubHollarAccount, hydrationHollarAccount] =
+    await Promise.all([
+      assetHubApi.query.System.Account.getValue(FELLOWSHIP_TREASURY_ACCOUNT),
+      assetHubApi.query.ForeignAssets.Account.getValue(
+        assetHubHollarAsset.assetId,
+        FELLOWSHIP_TREASURY_ACCOUNT,
+      ),
+      hydrationApi.apis.CurrenciesApi.account(
+        hydrationHollarAsset.assetId,
+        FELLOWSHIP_TREASURY_ACCOUNT,
+      ),
+    ]);
   const dotBalance = account?.data.free.toString() ?? "0";
-  const hollarBalance = hollarAccount?.balance.toString() ?? "0";
+  const hollarBalance =
+    BigInt(assetHubHollarAccount?.balance ?? 0) +
+    BigInt(hydrationHollarAccount.free);
 
   return {
     account: FELLOWSHIP_TREASURY_ACCOUNT,
     balances: {
       dot: formatAmount(dotBalance, dot.decimals),
-      hollar: formatAmount(hollarBalance, hollarAsset.decimals),
+      hollar: formatAmount(hollarBalance, assetHubHollarAsset.decimals),
     },
   };
 }
@@ -126,9 +135,7 @@ export async function getFellowshipTreasurySpend({ spend_index } = {}) {
   }
 
   const spend = await request.get(
-    createCollectivesUrl(
-      `${FELLOWSHIP_TREASURY_SPENDS_PATH}/${spend_index}`,
-    ),
+    createCollectivesUrl(`${FELLOWSHIP_TREASURY_SPENDS_PATH}/${spend_index}`),
   );
   return createFellowshipTreasurySpendDetail(spend);
 }
