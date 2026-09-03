@@ -7,21 +7,25 @@
   "main": "src/index.js",
   "packageManager": "pnpm@10.15.1",
   "engines": {
-    "node": ">=20.10.0"
+    "node": ">=22.4.0"
   },
   "scripts": {
+    "papi:update": "pnpm exec papi update",
+    "postinstall": "papi",
     "start": "node src/index.js",
     "no-proxy-start": "HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= http_proxy= https_proxy= all_proxy= NO_PROXY=* no_proxy=* node src/index.js"
   },
   "dependencies": {
     "@koa/router": "^15.7.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "@polkadot-api/descriptors": "file:.papi/descriptors",
     "bignumber.js": "^11.1.5",
+    "dotenv": "^17.2.3",
     "koa": "^3.2.1",
     "lodash": "^4.18.1",
-    "dotenv": "^17.2.3",
     "lru-cache": "^11.5.2",
     "p-limit": "^7.3.2",
+    "polkadot-api": "^3.1.0",
     "undici": "^6.28.0",
     "zod": "^3.25.76"
   }

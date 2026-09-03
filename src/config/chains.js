@@ -27,6 +27,25 @@ const chainSiteEndpoints = {
   [chains.hydration]: "https://hydration.subsquare.io",
 };
 
+export const chainRpcUrls = {
+  [chains.polkadot]: [
+    "wss://rpc.polkadot.io",
+    "wss://polkadot.api.onfinality.io/public-ws",
+  ],
+  [chains.kusama]: [
+    "wss://kusama-rpc.polkadot.io",
+    "wss://kusama.api.onfinality.io/public-ws",
+  ],
+  [chains.collectives]: [
+    "wss://polkadot-collectives-rpc.polkadot.io",
+    "wss://collectives.api.onfinality.io/public-ws",
+  ],
+  [chains.hydration]: [
+    "wss://hydration-rpc.n.dwellir.com",
+    "wss://rpc.hydradx.cloud",
+  ],
+};
+
 function getEndpointByChain(endpoints) {
   return (chain) => {
     const url = endpoints[chain];
