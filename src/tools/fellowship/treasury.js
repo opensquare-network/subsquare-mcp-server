@@ -59,12 +59,19 @@ export function registerFellowshipTreasuryTools(server) {
     "fellowship_treasury_get_balance",
     {
       description:
-        "Get the current Fellowship Treasury account's human-readable DOT and HOLLAR balances.",
+        "Get current Fellowship Treasury DOT/HOLLAR balances and Fellowship Salary USDT/HOLLAR balances on Polkadot Asset Hub.",
       inputSchema: {},
       outputSchema: {
         account: z.string().describe("Fellowship Treasury SS58 account on Polkadot Asset Hub"),
         balances: z.object({
           dot: z.string().describe("Human-readable DOT balance"),
+          hollar: z.string().describe("Human-readable HOLLAR balance"),
+        }),
+        salaryAccount: z
+          .string()
+          .describe("Fellowship Salary SS58 account on Polkadot Asset Hub"),
+        salaryBalances: z.object({
+          usdt: z.string().describe("Human-readable USDT balance"),
           hollar: z.string().describe("Human-readable HOLLAR balance"),
         }),
       },

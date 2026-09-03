@@ -10,6 +10,8 @@ const FELLOWSHIP_TREASURY_SPENDS_PATH = "fellowship/treasury/spends";
 const OVERVIEW_SUMMARY_PATH = "overview/summary";
 const FELLOWSHIP_TREASURY_ACCOUNT =
   "16VcQSRcMFy6ZHVjBvosKmo7FKqTb8ZATChDYo8ibutzLnos";
+const FELLOWSHIP_SALARY_ACCOUNT =
+  "13w7NdvSR1Af8xsQTArDtZmVvjE8XhWNdL4yed3iFHrUNCnS";
 
 function createCollectivesUrl(path) {
   const { apiUrl } = getChainConfig(chains.collectives);
@@ -85,11 +87,18 @@ export async function getFellowshipTreasuryStatus() {
 export async function getFellowshipTreasuryBalance() {
   const assetHubChain = chains.polkadotAssetHub;
   const dot = getAsset(assetHubChain, "DOT");
+  const usdt = getAsset(assetHubChain, "USDT");
   const assetHubHollarAsset = getAsset(assetHubChain, "HOLLAR");
   const hydrationHollarAsset = getAsset(chains.hydration, "HOLLAR");
   const assetHubApi = getTypedApi(assetHubChain);
   const hydrationApi = getTypedApi(chains.hydration);
-  const [account, assetHubHollarAccount, hydrationHollarAccount] =
+  const [
+    account,
+    assetHubHollarAccount,
+    hydrationHollarAccount,
+    salaryUsdtAccount,
+    salaryHollarAccount,
+  ] =
     await Promise.all([
       assetHubApi.query.System.Account.getValue(FELLOWSHIP_TREASURY_ACCOUNT),
       assetHubApi.query.ForeignAssets.Account.getValue(
@@ -99,6 +108,14 @@ export async function getFellowshipTreasuryBalance() {
       hydrationApi.apis.CurrenciesApi.account(
         hydrationHollarAsset.assetId,
         FELLOWSHIP_TREASURY_ACCOUNT,
+      ),
+      assetHubApi.query.Assets.Account.getValue(
+        usdt.assetId,
+        FELLOWSHIP_SALARY_ACCOUNT,
+      ),
+      assetHubApi.query.ForeignAssets.Account.getValue(
+        assetHubHollarAsset.assetId,
+        FELLOWSHIP_SALARY_ACCOUNT,
       ),
     ]);
   const dotBalance = account?.data.free.toString() ?? "0";
@@ -111,6 +128,14 @@ export async function getFellowshipTreasuryBalance() {
     balances: {
       dot: formatAmount(dotBalance, dot.decimals),
       hollar: formatAmount(hollarBalance, assetHubHollarAsset.decimals),
+    },
+    salaryAccount: FELLOWSHIP_SALARY_ACCOUNT,
+    salaryBalances: {
+      usdt: formatAmount(salaryUsdtAccount?.balance ?? 0, usdt.decimals),
+      hollar: formatAmount(
+        salaryHollarAccount?.balance ?? 0,
+        assetHubHollarAsset.decimals,
+      ),
     },
   };
 }
