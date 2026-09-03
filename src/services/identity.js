@@ -1,3 +1,4 @@
+import pick from "lodash/pick.js";
 import { getIdentityConfig } from "../config/chains.js";
 import { request } from "./api.js";
 
@@ -5,6 +6,19 @@ function getUniqueAddresses(addresses) {
   return [
     ...new Set(addresses.filter((address) => typeof address === "string")),
   ];
+}
+
+export function createCompactIdentity(identity) {
+  if (!identity || typeof identity !== "object") {
+    return null;
+  }
+
+  const compactIdentity = { address: identity.address };
+  if (identity.info && typeof identity.info === "object") {
+    compactIdentity.info = pick(identity.info, ["status", "display"]);
+  }
+
+  return compactIdentity;
 }
 
 export async function getIdentityMap({ chain, addresses = [] } = {}) {
@@ -29,6 +43,11 @@ export async function getIdentityMap({ chain, addresses = [] } = {}) {
   }
 
   return new Map(identities.map((identity) => [identity.address, identity]));
+}
+
+export async function createIdentityResolver({ chain, addresses } = {}) {
+  const identityMap = await getIdentityMap({ chain, addresses });
+  return (address) => createCompactIdentity(identityMap.get(address));
 }
 
 export async function getIdentity({ chain, address } = {}) {

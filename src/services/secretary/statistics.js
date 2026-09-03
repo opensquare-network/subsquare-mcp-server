@@ -2,11 +2,11 @@ import BigNumber from "bignumber.js";
 import { chains } from "../../config/chain.js";
 import { getChainConfig } from "../../config/chains.js";
 import { request } from "../api.js";
+import { createIdentityResolver } from "../identity.js";
 import { formatAmount } from "../../utils/amount.js";
 import {
   SECRETARY_SALARY_CYCLES_STATISTICS_PATH,
   SECRETARY_SALARY_MEMBERS_STATISTICS_PATH,
-  createSecretaryIdentityResolver,
 } from "./common.js";
 
 export async function getSecretarySalaryStatistics() {
@@ -16,7 +16,10 @@ export async function getSecretarySalaryStatistics() {
     members.map((member) => [member.address, member]),
   );
   const addresses = collectStatisticAddresses(members, paymentReferenda);
-  const compactIdentity = await createSecretaryIdentityResolver(addresses);
+  const compactIdentity = await createIdentityResolver({
+    chain: chains.collectives,
+    addresses,
+  });
 
   const fundingByBeneficiary = summarizeFunding(paymentReferenda);
   const byAddress = createByAddressEntries(

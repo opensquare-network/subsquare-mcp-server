@@ -7,6 +7,8 @@ import {
 import {
   getTreasuryStatus,
   listTreasuryProjects,
+  listTreasuryProposals,
+  listTreasurySpends,
   summarizeTreasuryProject,
 } from "../../services/treasury/index.js";
 import {
@@ -21,6 +23,22 @@ const treasuryChain = z
   .describe("Treasury chain to query: polkadot or kusama");
 
 const treasuryStatusInputSchema = { chain: treasuryChain };
+const treasuryListInputSchema = {
+  chain: treasuryChain,
+  page: z
+    .number()
+    .int()
+    .positive()
+    .default(1)
+    .describe("Page number, starts at 1 (default 1)"),
+  page_size: z
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .default(25)
+    .describe("Items per page (default 25)"),
+};
 
 const treasuryBalancesInputSchema = {
   chain: z
@@ -89,6 +107,28 @@ export function registerTreasuryTools(server) {
   );
 
   registerTreasuryProjectTools(server);
+
+  server.registerTool(
+    "treasury_list_proposals",
+    {
+      description:
+        "List Treasury proposals on Polkadot or Kusama with pagination and active/total statistics.",
+      inputSchema: treasuryListInputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async (args) => createJsonResult(await listTreasuryProposals(args)),
+  );
+
+  server.registerTool(
+    "treasury_list_spends",
+    {
+      description:
+        "List Treasury spends on Polkadot or Kusama with pagination and active/total statistics.",
+      inputSchema: treasuryListInputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async (args) => createJsonResult(await listTreasurySpends(args)),
+  );
 
   server.registerTool(
     "treasury_get_status",
