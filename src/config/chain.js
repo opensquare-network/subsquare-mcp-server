@@ -3,6 +3,8 @@ export const chains = Object.freeze({
   collectives: "collectives",
   hydration: "hydration",
   kusama: "kusama",
+  polkadotAssetHub: "polkadotAssetHub",
+  kusamaAssetHub: "kusamaAssetHub",
 });
 
 export function isPolkadotChain(chain) {

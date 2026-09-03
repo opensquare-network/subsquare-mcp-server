@@ -1,15 +1,14 @@
 import isNil from "lodash/isNil.js";
 import { chains } from "../../config/chain.js";
 import { getChainConfig } from "../../config/chains.js";
+import { assetDecimals } from "../../config/assets.js";
+import { fellowshipTreasuryAssetHub } from "../../config/fellowshipTreasury.js";
 import { formatAmount } from "../../utils/amount.js";
 import { request } from "../api.js";
+import { getTypedApi } from "../papi.js";
 
 const FELLOWSHIP_TREASURY_SPENDS_PATH = "fellowship/treasury/spends";
 const OVERVIEW_SUMMARY_PATH = "overview/summary";
-const FELLOWSHIP_TREASURY_ASSET_DECIMALS = Object.freeze({
-  DOT: 10,
-  HOLLAR: 18,
-});
 
 function createCollectivesUrl(path) {
   const { apiUrl } = getChainConfig(chains.collectives);
@@ -28,7 +27,7 @@ function getFellowshipTreasuryExtracted(spend) {
 function formatFellowshipTreasuryAmount(extracted) {
   const rawAmount = extracted?.amount;
   const symbol = extracted?.assetKind?.symbol?.toUpperCase();
-  const decimals = FELLOWSHIP_TREASURY_ASSET_DECIMALS[symbol];
+  const decimals = assetDecimals[symbol];
 
   if (isNil(rawAmount) || isNil(decimals)) {
     return null;
@@ -79,6 +78,33 @@ export async function getFellowshipTreasuryStatus() {
   return {
     active,
     total,
+  };
+}
+
+export async function getFellowshipTreasuryBalance() {
+  const api = getTypedApi(chains.polkadotAssetHub);
+  const [account, hollar] = await Promise.all([
+    api.query.System.Account.getValue(fellowshipTreasuryAssetHub.account),
+    api.query.ForeignAssets.Account.getValue(
+      fellowshipTreasuryAssetHub.hollarAssetId,
+      fellowshipTreasuryAssetHub.account,
+    ),
+  ]);
+  const rawBalances = {
+    dot: account?.data.free.toString() ?? "0",
+    hollar: hollar?.balance.toString() ?? "0",
+  };
+
+  return {
+    account: fellowshipTreasuryAssetHub.account,
+    balances: {
+      dot: formatAmount(rawBalances.dot, assetDecimals.DOT),
+      hollar: formatAmount(
+        rawBalances.hollar,
+        assetDecimals.HOLLAR,
+      ),
+    },
+    rawBalances,
   };
 }
 

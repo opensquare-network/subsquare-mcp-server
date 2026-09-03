@@ -44,6 +44,8 @@ export const chainRpcUrls = {
     "wss://hydration-rpc.n.dwellir.com",
     "wss://rpc.hydradx.cloud",
   ],
+  [chains.polkadotAssetHub]: ["wss://polkadot-asset-hub-rpc.polkadot.io"],
+  [chains.kusamaAssetHub]: ["wss://kusama-asset-hub-rpc.polkadot.io"],
 };
 
 function getEndpointByChain(endpoints) {

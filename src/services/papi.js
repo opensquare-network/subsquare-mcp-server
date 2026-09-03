@@ -2,7 +2,9 @@ import {
   collectives,
   hydration,
   kusama,
+  kusamaAssetHub,
   polkadot,
+  polkadotAssetHub,
 } from "@polkadot-api/descriptors";
 import { createWsClient } from "polkadot-api/ws";
 
@@ -12,21 +14,25 @@ import { chainRpcUrls } from "../config/chains.js";
 const papiClients = new Map();
 const typedApis = new Map();
 
-const descriptorsByChain = new Map([
-  [chains.polkadot, polkadot],
-  [chains.kusama, kusama],
-  [chains.collectives, collectives],
-  [chains.hydration, hydration],
-]);
+/**
+ * @typedef {Object} DescriptorsByChain
+ * @property {import("@polkadot-api/descriptors").Polkadot} polkadot
+ * @property {import("@polkadot-api/descriptors").Kusama} kusama
+ * @property {import("@polkadot-api/descriptors").Collectives} collectives
+ * @property {import("@polkadot-api/descriptors").Hydration} hydration
+ * @property {import("@polkadot-api/descriptors").PolkadotAssetHub} polkadotAssetHub
+ * @property {import("@polkadot-api/descriptors").KusamaAssetHub} kusamaAssetHub
+ */
 
-function getDescriptorByChain(chain) {
-  const descriptor = descriptorsByChain.get(chain);
-  if (!descriptor) {
-    throw new Error(`${chain} does not have PAPI descriptors`);
-  }
-
-  return descriptor;
-}
+/** @type {DescriptorsByChain} */
+const descriptorsByChain = {
+  [chains.polkadot]: polkadot,
+  [chains.kusama]: kusama,
+  [chains.collectives]: collectives,
+  [chains.hydration]: hydration,
+  [chains.polkadotAssetHub]: polkadotAssetHub,
+  [chains.kusamaAssetHub]: kusamaAssetHub,
+};
 
 export function getPapiClient(chain) {
   const cachedClient = papiClients.get(chain);
@@ -45,17 +51,26 @@ export function getPapiClient(chain) {
   return client;
 }
 
+/**
+ * @template {keyof typeof descriptorsByChain} Chain
+ * @param {Chain} chain
+ * @returns {import("polkadot-api").TypedApi<(typeof descriptorsByChain)[Chain]>}
+ */
 export function getTypedApi(chain) {
-  const cachedApi = typedApis.get(chain);
-  if (cachedApi) {
-    return cachedApi;
+  let api = typedApis.get(chain);
+  if (!api) {
+    const descriptor = descriptorsByChain[chain];
+    if (!descriptor) {
+      throw new Error(`${chain} does not have PAPI descriptors`);
+    }
+
+    api = getPapiClient(chain).getTypedApi(descriptor);
+    typedApis.set(chain, api);
   }
 
-  const descriptor = getDescriptorByChain(chain);
-  const api = getPapiClient(chain).getTypedApi(descriptor);
-  typedApis.set(chain, api);
-
-  return api;
+  return /** @type {import("polkadot-api").TypedApi<(typeof descriptorsByChain)[Chain]>} */ (
+    api
+  );
 }
 
 export function destroyPapiClient(chain) {

@@ -25,6 +25,18 @@
       "metadata": ".papi/metadata/hydration.scale",
       "genesis": "0xafdc188f45c71dacbaa0b62e16a91f726c7b8699a9748cdf715459de6b7f366d",
       "codeHash": "0xd3b64a653eac65e5d5b1e948e21dce151b980d1779baa63e78418e18c3e3f1fe"
+    },
+    "kusamaAssetHub": {
+      "wsUrl": "wss://kusama-asset-hub-rpc.polkadot.io",
+      "metadata": ".papi/metadata/kusamaAssetHub.scale",
+      "genesis": "0x48239ef607d7928874027a43a67689209727dfb3d3dc5e5b03a39bdc2eda771a",
+      "codeHash": "0x929a5d7409e583c593420b33be6cd3e2e7fe27229bb9accee38864452d2d6f03"
+    },
+    "polkadotAssetHub": {
+      "wsUrl": "wss://polkadot-asset-hub-rpc.polkadot.io",
+      "metadata": ".papi/metadata/polkadotAssetHub.scale",
+      "genesis": "0x68d56f15f85d3136970ec16946040bc1752654e906147f7e43e9d539d7c3de2f",
+      "codeHash": "0x5d7c1c7dcb717543f074dc726622aafaeaafbbec91f5b79a43e5ed8ac15c35d1"
     }
   }
 }
