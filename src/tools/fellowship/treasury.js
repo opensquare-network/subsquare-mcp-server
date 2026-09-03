@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   getFellowshipTreasurySpend,
+  getFellowshipTreasuryBalance,
   getFellowshipTreasuryStatus,
   listFellowshipTreasurySpends,
 } from "../../services/fellowship/treasury.js";
@@ -54,6 +55,31 @@ const fellowshipTreasurySpendDetailSchema = fellowshipTreasurySpendSchema.extend
 );
 
 export function registerFellowshipTreasuryTools(server) {
+  server.registerTool(
+    "fellowship_treasury_get_balance",
+    {
+      description:
+        "Get current Fellowship Treasury DOT/HOLLAR balances and Fellowship Salary USDT/HOLLAR balances on Polkadot Asset Hub.",
+      inputSchema: {},
+      outputSchema: {
+        account: z.string().describe("Fellowship Treasury SS58 account on Polkadot Asset Hub"),
+        balances: z.object({
+          dot: z.string().describe("Human-readable DOT balance"),
+          hollar: z.string().describe("Human-readable HOLLAR balance"),
+        }),
+        salaryAccount: z
+          .string()
+          .describe("Fellowship Salary SS58 account on Polkadot Asset Hub"),
+        salaryBalances: z.object({
+          usdt: z.string().describe("Human-readable USDT balance"),
+          hollar: z.string().describe("Human-readable HOLLAR balance"),
+        }),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async () => createStructuredJsonResult(await getFellowshipTreasuryBalance()),
+  );
+
   server.registerTool(
     "fellowship_treasury_get_status",
     {

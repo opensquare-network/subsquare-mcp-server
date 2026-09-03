@@ -1,4 +1,5 @@
 import pick from "lodash/pick.js";
+import { getAsset } from "../config/assets.js";
 import { chains } from "../config/chain.js";
 import { getChainConfig } from "../config/chains.js";
 import { request } from "./api.js";
@@ -18,15 +19,7 @@ const FELLOWSHIP_MEMBERS_PATH = "fellowship/members";
 const FELLOWSHIP_FEEDS_PATH = "fellowship/feeds";
 const FELLOWSHIP_CORE_PARAMS_PATH = "fellowship/core/params";
 const SCAN_HEIGHT_PATH = "inspect/scan-height";
-const DEFAULT_FELLOWSHIP_SALARY_ASSET = Object.freeze({
-  symbol: "USDT",
-  decimals: 6,
-});
 const HOLLAR_SALARY_START_BLOCK = 9_247_655;
-const HOLLAR_FELLOWSHIP_SALARY_ASSET = Object.freeze({
-  symbol: "HOLLAR",
-  decimals: 18,
-});
 const HISTORY_PAGE_FIELDS = ["page", "pageSize", "total"];
 const EVIDENCE_FIELDS = [
   "cid",
@@ -82,14 +75,13 @@ const FEED_INDEXER_FIELDS = ["blockHeight", "blockTime"];
 const FEED_MEMBER_INFO_FIELDS = ["rank", "isActive"];
 
 function getFellowshipSalaryAsset(blockHeight) {
-  if (
+  const symbol =
     Number.isInteger(blockHeight) &&
     blockHeight >= HOLLAR_SALARY_START_BLOCK
-  ) {
-    return HOLLAR_FELLOWSHIP_SALARY_ASSET;
-  }
+      ? "HOLLAR"
+      : "USDT";
 
-  return DEFAULT_FELLOWSHIP_SALARY_ASSET;
+  return getAsset(chains.polkadotAssetHub, symbol);
 }
 
 function formatFellowshipSalaryDisplay(rawSalary, salaryAsset) {

@@ -1,15 +1,17 @@
 import isNil from "lodash/isNil.js";
+import { getAsset } from "../../config/assets.js";
 import { chains } from "../../config/chain.js";
 import { getChainConfig } from "../../config/chains.js";
 import { formatAmount } from "../../utils/amount.js";
 import { request } from "../api.js";
+import { getTypedApi } from "../papi.js";
 
 const FELLOWSHIP_TREASURY_SPENDS_PATH = "fellowship/treasury/spends";
 const OVERVIEW_SUMMARY_PATH = "overview/summary";
-const FELLOWSHIP_TREASURY_ASSET_DECIMALS = Object.freeze({
-  DOT: 10,
-  HOLLAR: 18,
-});
+const FELLOWSHIP_TREASURY_ACCOUNT =
+  "16VcQSRcMFy6ZHVjBvosKmo7FKqTb8ZATChDYo8ibutzLnos";
+const FELLOWSHIP_SALARY_ACCOUNT =
+  "13w7NdvSR1Af8xsQTArDtZmVvjE8XhWNdL4yed3iFHrUNCnS";
 
 function createCollectivesUrl(path) {
   const { apiUrl } = getChainConfig(chains.collectives);
@@ -28,7 +30,7 @@ function getFellowshipTreasuryExtracted(spend) {
 function formatFellowshipTreasuryAmount(extracted) {
   const rawAmount = extracted?.amount;
   const symbol = extracted?.assetKind?.symbol?.toUpperCase();
-  const decimals = FELLOWSHIP_TREASURY_ASSET_DECIMALS[symbol];
+  const decimals = getAsset(chains.polkadotAssetHub, symbol)?.decimals;
 
   if (isNil(rawAmount) || isNil(decimals)) {
     return null;
@@ -82,6 +84,62 @@ export async function getFellowshipTreasuryStatus() {
   };
 }
 
+export async function getFellowshipTreasuryBalance() {
+  const assetHubChain = chains.polkadotAssetHub;
+  const dot = getAsset(assetHubChain, "DOT");
+  const usdt = getAsset(assetHubChain, "USDT");
+  const assetHubHollarAsset = getAsset(assetHubChain, "HOLLAR");
+  const hydrationHollarAsset = getAsset(chains.hydration, "HOLLAR");
+  const assetHubApi = getTypedApi(assetHubChain);
+  const hydrationApi = getTypedApi(chains.hydration);
+  const [
+    account,
+    assetHubHollarAccount,
+    hydrationHollarAccount,
+    salaryUsdtAccount,
+    salaryHollarAccount,
+  ] =
+    await Promise.all([
+      assetHubApi.query.System.Account.getValue(FELLOWSHIP_TREASURY_ACCOUNT),
+      assetHubApi.query.ForeignAssets.Account.getValue(
+        assetHubHollarAsset.assetId,
+        FELLOWSHIP_TREASURY_ACCOUNT,
+      ),
+      hydrationApi.apis.CurrenciesApi.account(
+        hydrationHollarAsset.assetId,
+        FELLOWSHIP_TREASURY_ACCOUNT,
+      ),
+      assetHubApi.query.Assets.Account.getValue(
+        usdt.assetId,
+        FELLOWSHIP_SALARY_ACCOUNT,
+      ),
+      assetHubApi.query.ForeignAssets.Account.getValue(
+        assetHubHollarAsset.assetId,
+        FELLOWSHIP_SALARY_ACCOUNT,
+      ),
+    ]);
+  const dotBalance = account?.data.free.toString() ?? "0";
+  const hollarBalance =
+    BigInt(assetHubHollarAccount?.balance ?? 0) +
+    BigInt(hydrationHollarAccount.free);
+
+  return {
+    account: FELLOWSHIP_TREASURY_ACCOUNT,
+    balances: {
+      dot: formatAmount(dotBalance, dot.decimals),
+      hollar: formatAmount(hollarBalance, assetHubHollarAsset.decimals),
+    },
+    salaryAccount: FELLOWSHIP_SALARY_ACCOUNT,
+    salaryBalances: {
+      usdt: formatAmount(salaryUsdtAccount?.balance ?? 0, usdt.decimals),
+      hollar: formatAmount(
+        salaryHollarAccount?.balance ?? 0,
+        assetHubHollarAsset.decimals,
+      ),
+    },
+  };
+}
+
 export async function listFellowshipTreasurySpends(query = {}) {
   const response = await request.get(
     createCollectivesUrl(FELLOWSHIP_TREASURY_SPENDS_PATH),
@@ -102,9 +160,7 @@ export async function getFellowshipTreasurySpend({ spend_index } = {}) {
   }
 
   const spend = await request.get(
-    createCollectivesUrl(
-      `${FELLOWSHIP_TREASURY_SPENDS_PATH}/${spend_index}`,
-    ),
+    createCollectivesUrl(`${FELLOWSHIP_TREASURY_SPENDS_PATH}/${spend_index}`),
   );
   return createFellowshipTreasurySpendDetail(spend);
 }
