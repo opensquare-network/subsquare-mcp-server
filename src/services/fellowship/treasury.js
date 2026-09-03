@@ -1,14 +1,15 @@
 import isNil from "lodash/isNil.js";
+import { getAsset } from "../../config/assets.js";
 import { chains } from "../../config/chain.js";
 import { getChainConfig } from "../../config/chains.js";
-import { assetDecimals } from "../../config/assets.js";
-import { fellowshipTreasuryAssetHub } from "../../config/fellowshipTreasury.js";
 import { formatAmount } from "../../utils/amount.js";
 import { request } from "../api.js";
 import { getTypedApi } from "../papi.js";
 
 const FELLOWSHIP_TREASURY_SPENDS_PATH = "fellowship/treasury/spends";
 const OVERVIEW_SUMMARY_PATH = "overview/summary";
+const FELLOWSHIP_TREASURY_ACCOUNT =
+  "16VcQSRcMFy6ZHVjBvosKmo7FKqTb8ZATChDYo8ibutzLnos";
 
 function createCollectivesUrl(path) {
   const { apiUrl } = getChainConfig(chains.collectives);
@@ -27,7 +28,7 @@ function getFellowshipTreasuryExtracted(spend) {
 function formatFellowshipTreasuryAmount(extracted) {
   const rawAmount = extracted?.amount;
   const symbol = extracted?.assetKind?.symbol?.toUpperCase();
-  const decimals = assetDecimals[symbol];
+  const decimals = getAsset(chains.polkadotAssetHub, symbol)?.decimals;
 
   if (isNil(rawAmount) || isNil(decimals)) {
     return null;
@@ -82,27 +83,27 @@ export async function getFellowshipTreasuryStatus() {
 }
 
 export async function getFellowshipTreasuryBalance() {
-  const api = getTypedApi(chains.polkadotAssetHub);
-  const [account, hollar] = await Promise.all([
-    api.query.System.Account.getValue(fellowshipTreasuryAssetHub.account),
+  const assetHubChain = chains.polkadotAssetHub;
+  const dot = getAsset(assetHubChain, "DOT");
+  const hollarAsset = getAsset(assetHubChain, "HOLLAR");
+  const api = getTypedApi(assetHubChain);
+  const [account, hollarAccount] = await Promise.all([
+    api.query.System.Account.getValue(FELLOWSHIP_TREASURY_ACCOUNT),
     api.query.ForeignAssets.Account.getValue(
-      fellowshipTreasuryAssetHub.hollarAssetId,
-      fellowshipTreasuryAssetHub.account,
+      hollarAsset.assetId,
+      FELLOWSHIP_TREASURY_ACCOUNT,
     ),
   ]);
   const rawBalances = {
     dot: account?.data.free.toString() ?? "0",
-    hollar: hollar?.balance.toString() ?? "0",
+    hollar: hollarAccount?.balance.toString() ?? "0",
   };
 
   return {
-    account: fellowshipTreasuryAssetHub.account,
+    account: FELLOWSHIP_TREASURY_ACCOUNT,
     balances: {
-      dot: formatAmount(rawBalances.dot, assetDecimals.DOT),
-      hollar: formatAmount(
-        rawBalances.hollar,
-        assetDecimals.HOLLAR,
-      ),
+      dot: formatAmount(rawBalances.dot, dot.decimals),
+      hollar: formatAmount(rawBalances.hollar, hollarAsset.decimals),
     },
     rawBalances,
   };

@@ -1,12 +1,7 @@
 import BigNumber from "bignumber.js";
+import { getAsset } from "../../../config/assets.js";
+import { chains } from "../../../config/chain.js";
 
-const POLKADOT_DECIMALS = 10;
-const ASSET_DECIMALS = Object.freeze({
-  DOT: POLKADOT_DECIMALS,
-  USDT: 6,
-  USDC: 6,
-  HOLLAR: 18,
-});
 const STABLECOIN_SYMBOLS = new Set(["USDC", "USDT", "HOLLAR"]);
 const ASSET_HUB_GENERAL_INDEX_SYMBOLS = Object.freeze({
   1337: "USDC",
@@ -43,6 +38,13 @@ function scaleAmount(value, decimals) {
   return amount.div(new BigNumber(10).pow(decimals));
 }
 
+function getPolkadotTreasuryAsset(symbol) {
+  return (
+    getAsset(chains.polkadot, symbol) ??
+    getAsset(chains.polkadotAssetHub, symbol)
+  );
+}
+
 function calculatePriceFiat(value, price) {
   const submissionPrice = asBigNumber(price?.submission);
   const finalPrice = asBigNumber(price?.final ?? price?.current);
@@ -66,16 +68,17 @@ function calculateSpendFiat(detail) {
 
   if (assetKind?.type === "native") {
     return calculatePriceFiat(
-      scaleAmount(amount, POLKADOT_DECIMALS),
+      scaleAmount(amount, getPolkadotTreasuryAsset("DOT").decimals),
       detail.onchainData?.price,
     );
   }
 
-  if (!Object.hasOwn(ASSET_DECIMALS, symbol)) {
+  const asset = getPolkadotTreasuryAsset(symbol);
+  if (asset == null) {
     return { submission: new BigNumber(0), final: new BigNumber(0) };
   }
 
-  const fiat = scaleAmount(amount, ASSET_DECIMALS[symbol]);
+  const fiat = scaleAmount(amount, asset.decimals);
   return { submission: fiat, final: fiat };
 }
 
@@ -152,7 +155,11 @@ function getMultiAssetSymbol(assetKind) {
 function calculateMultiAssetBountyFiat(detail) {
   const { assetKind, price, value } = detail.onchainData ?? {};
   const symbol = getMultiAssetSymbol(assetKind) ?? "DOT";
-  const amount = scaleAmount(value, ASSET_DECIMALS[symbol] ?? POLKADOT_DECIMALS);
+  const asset = getPolkadotTreasuryAsset(symbol);
+  const amount = scaleAmount(
+    value,
+    asset?.decimals ?? getPolkadotTreasuryAsset("DOT").decimals,
+  );
 
   if (STABLECOIN_SYMBOLS.has(symbol)) {
     return { submission: null, final: amount };
