@@ -1,9 +1,10 @@
+export { getTreasuryStatus } from "./summary.js";
+export { listTreasuryProposals } from "./proposals.js";
+export { listTreasurySpends } from "./spends.js";
+export { listTreasuryTips } from "./tips.js";
+export { getBounty, listBounties } from "./bounties.js";
 export {
-  getTreasuryStatus,
+  getTreasuryProjectDetail,
   listTreasuryProjects,
-  listTreasuryProposals,
-  listTreasurySpends,
-  listTreasuryTips,
-} from "./api.js";
-export { getTreasuryProjectDetail } from "./projects/index.js";
-export { summarizeTreasuryProject } from "./projects/fetch.js";
+  summarizeTreasuryProject,
+} from "./projects/index.js";

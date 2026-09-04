@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { bountyChains } from "../config/chains.js";
-import { getBounty, listBounties } from "../services/bounties.js";
+import { getBounty, listBounties } from "../services/treasury/index.js";
 import {
   createJsonResult,
   paginationInputShape,

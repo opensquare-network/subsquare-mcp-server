@@ -2,7 +2,8 @@ import pick from "lodash/pick.js";
 import pLimit from "p-limit";
 import { chains } from "../../../config/chain.js";
 import { getChainConfig } from "../../../config/chains.js";
-import { getTreasuryProjectItemDetail } from "../api.js";
+import { request } from "../../api.js";
+import { createTreasuryUrl } from "../common.js";
 import { calculateTreasuryItemFiat } from "./amounts.js";
 
 const PROJECT_FIELDS = [
@@ -107,6 +108,22 @@ const projectItemTypes = Object.freeze(
 
 export function summarizeTreasuryProject(project) {
   return pick(project, PROJECT_FIELDS);
+}
+
+function createProjectItemDetailUrl(detailPath, id) {
+  const value = String(id).trim();
+  if (!value) {
+    throw new Error("Treasury detail ID is required");
+  }
+
+  return createTreasuryUrl(
+    detailPath + "/" + encodeURIComponent(value),
+    chains.polkadot,
+  );
+}
+
+function getTreasuryProjectItemDetail(detailPath, id) {
+  return request.get(createProjectItemDetailUrl(detailPath, id));
 }
 
 function getProjectItemId(itemType, relation) {
