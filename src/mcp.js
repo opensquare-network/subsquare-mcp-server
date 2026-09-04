@@ -4,6 +4,7 @@ import {
   registerAddressFellowshipTools,
   registerAddressReferendaTools,
   registerAddressVotesTools,
+  registerDemocracyTools,
   registerFellowshipTools,
   registerIdentityTools,
   registerReferendaTools,
@@ -34,6 +35,7 @@ export function createMcpServer() {
   registerAddressFellowshipTools(server);
   registerAddressReferendaTools(server);
   registerAddressVotesTools(server);
+  registerDemocracyTools(server);
   registerFellowshipTools(server);
   registerIdentityTools(server);
   registerReferendaTools(server);
