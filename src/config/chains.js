@@ -4,7 +4,11 @@ const DEFAULT_REFERENDA_PATH = "gov2/referendums";
 const COLLECTIVES_REFERENDA_PATH = "fellowship/referenda";
 
 export const supportedChains = Object.values(chains);
-export const treasuryChains = [chains.polkadot, chains.kusama];
+export const treasuryChains = [
+  chains.polkadot,
+  chains.kusama,
+  chains.hydration,
+];
 
 const identityChains = {
   [chains.polkadot]: chains.polkadot,

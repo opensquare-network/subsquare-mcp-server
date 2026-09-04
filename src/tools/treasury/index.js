@@ -20,7 +20,7 @@ import { registerTreasuryProjectTools } from "./projects.js";
 
 const treasuryChain = z
   .enum(treasuryChains)
-  .describe("Treasury chain to query: polkadot or kusama");
+  .describe("Treasury chain to query: polkadot, kusama, or hydration");
 
 const treasuryStatusInputSchema = { chain: treasuryChain };
 const treasuryListInputSchema = {
@@ -112,7 +112,7 @@ export function registerTreasuryTools(server) {
     "treasury_list_proposals",
     {
       description:
-        "List Treasury proposals on Polkadot or Kusama with pagination and active/total statistics.",
+        "List Treasury proposals on Polkadot, Kusama, or Hydration with pagination and active/total statistics.",
       inputSchema: treasuryListInputSchema,
       annotations: readOnlyAnnotations,
     },
@@ -123,7 +123,7 @@ export function registerTreasuryTools(server) {
     "treasury_list_spends",
     {
       description:
-        "List Treasury spends on Polkadot or Kusama with pagination and active/total statistics.",
+        "List Treasury spends on Polkadot, Kusama, or Hydration with pagination and active/total statistics.",
       inputSchema: treasuryListInputSchema,
       annotations: readOnlyAnnotations,
     },
@@ -134,7 +134,7 @@ export function registerTreasuryTools(server) {
     "treasury_get_status",
     {
       description:
-        "Summarize current Treasury activity for Polkadot or Kusama with active and total counts.",
+        "Summarize current Treasury activity for Polkadot, Kusama, or Hydration with active and total counts.",
       inputSchema: treasuryStatusInputSchema,
       annotations: readOnlyAnnotations,
     },

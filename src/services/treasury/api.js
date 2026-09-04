@@ -13,6 +13,11 @@ const TREASURY_PROPOSALS_API_PATH = "treasury/proposals";
 const TREASURY_SPENDS_API_PATH = "treasury/spends";
 const PROJECTS_CACHE_TTL_MS = 5 * 60 * 1000;
 const TREASURY_LIST_ITEM_FIELDS = ["title", "state", "proposer", "beneficiary"];
+const TREASURY_NATIVE_ASSET_SYMBOLS = {
+  [chains.polkadot]: "DOT",
+  [chains.kusama]: "KSM",
+  [chains.hydration]: "HDX",
+};
 
 const projectsCache = new LRUCache({
   max: 1,
@@ -85,7 +90,7 @@ function getTreasurySpendAsset(chain, extracted) {
 
 function createTreasuryProposalListItem(item, resolveIdentity, chain) {
   const index = item.proposalIndex;
-  const asset = getAsset(chain, chain === chains.polkadot ? "DOT" : "KSM");
+  const asset = getAsset(chain, TREASURY_NATIVE_ASSET_SYMBOLS[chain]);
 
   return {
     index,
