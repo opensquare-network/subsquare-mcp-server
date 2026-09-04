@@ -1,5 +1,6 @@
 import { getChainConfig } from "../config/chains.js";
 import { request } from "./api.js";
+import { createIdentityResolver } from "./identity.js";
 
 export async function getBlockDetail({ chain, block_id } = {}) {
   const { stateScanApiUrl: apiUrl, stateScanSiteUrl: siteUrl } =
@@ -18,9 +19,15 @@ export async function getBlockDetail({ chain, block_id } = {}) {
   const block = await request.get(
     new URL(`blocks/${encodeURIComponent(blockId)}`, apiUrl),
   );
+  const resolveIdentity = await createIdentityResolver({
+    chain,
+    addresses: [block.validator],
+  });
+
   return {
     chain,
     ...block,
+    validatorIdentity: resolveIdentity(block.validator),
     url: new URL(`blocks/${block.height}`, siteUrl).toString(),
   };
 }
