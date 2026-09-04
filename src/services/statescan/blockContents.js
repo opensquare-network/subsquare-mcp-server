@@ -4,7 +4,6 @@ import { createIdentityResolver } from "../identity.js";
 import { resolveBlockHeight } from "./block.js";
 
 const filterNames = [
-  "spec",
   "section",
   "method",
   "block_start",
@@ -37,10 +36,8 @@ async function listBlockContents(args, path) {
     page_size: pageSize,
     time_dimension: timeDimension = "block",
   } = args;
-  const {
-    stateScanApiUrl: apiUrl,
-    stateScanSiteUrl: siteUrl,
-  } = getChainConfig(chain);
+  const { stateScanApiUrl: apiUrl, stateScanSiteUrl: siteUrl } =
+    getChainConfig(chain);
   const query = {
     page,
     page_size: pageSize,
@@ -50,8 +47,7 @@ async function listBlockContents(args, path) {
   for (const name of filterNames) query[name] = args[name];
 
   const hasFilters =
-    timeDimension === "date" ||
-    filterNames.some((name) => args[name] != null);
+    timeDimension === "date" || filterNames.some((name) => args[name] != null);
   if (args.block_id != null || !hasFilters) {
     const blockHeight = await resolveBlockHeight(args);
     query.time_dimension = "block";
@@ -61,7 +57,7 @@ async function listBlockContents(args, path) {
 
   const result = await request.get(new URL(path, apiUrl), query);
 
-  return { result, siteUrl };
+  return { result: { ...result, items: result?.items ?? [] }, siteUrl };
 }
 
 export async function listBlockEvents(args = {}) {

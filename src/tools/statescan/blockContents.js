@@ -22,12 +22,6 @@ const paginationInputShape = {
     .describe("Items per page (default 10)"),
 };
 const filterInputShape = {
-  spec: z
-    .number()
-    .int()
-    .nonnegative()
-    .optional()
-    .describe("Runtime spec version"),
   section: z.string().trim().min(1).optional().describe("Pallet section"),
   method: z.string().trim().min(1).optional().describe("Method name"),
   time_dimension: z
@@ -55,7 +49,7 @@ export function registerBlockContentsTools(server) {
     "block_list_events",
     {
       description:
-        "List StateScan events with optional block, runtime spec, section, method, block range, or date range filters. Uses the latest block when no filters are provided.",
+        "List StateScan events with optional block, section, method, block range, or date range filters. Uses the latest block when no filters are provided.",
       inputSchema: {
         chain,
         block_id: optionalBlockId,
@@ -71,7 +65,7 @@ export function registerBlockContentsTools(server) {
     "block_list_extrinsics",
     {
       description:
-        "List StateScan extrinsics with optional block, runtime spec, section, method, block range, or date range filters. Uses the latest block when no filters are provided.",
+        "List StateScan extrinsics with optional block, section, method, block range, or date range filters. Uses the latest block when no filters are provided.",
       inputSchema: {
         chain,
         block_id: optionalBlockId,
