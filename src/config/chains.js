@@ -43,6 +43,13 @@ const stateScanApiEndpoints = {
   [chains.kusama]: "https://kusama-api.statescan.io",
   [chains.collectives]: "https://collectives-api.statescan.io",
 };
+
+const stateScanSiteEndpoints = {
+  [chains.polkadot]: "https://polkadot.statescan.io",
+  [chains.kusama]: "https://kusama.statescan.io",
+  [chains.collectives]: "https://collectives.statescan.io",
+};
+
 export const stateScanChains = Object.keys(stateScanApiEndpoints);
 
 export const chainRpcUrls = {
@@ -94,6 +101,7 @@ export function getChainConfig(chain) {
     apiUrl: getApiUrlByChain(chain),
     siteUrl: getSiteUrlByChain(chain),
     stateScanApiUrl: stateScanApiEndpoints[chain],
+    stateScanSiteUrl: stateScanSiteEndpoints[chain],
     referendaPath: isCollectivesChain(chain)
       ? COLLECTIVES_REFERENDA_PATH
       : DEFAULT_REFERENDA_PATH,

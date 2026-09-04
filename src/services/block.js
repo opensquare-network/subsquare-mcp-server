@@ -2,7 +2,8 @@ import { getChainConfig } from "../config/chains.js";
 import { request } from "./api.js";
 
 export async function getBlockDetail({ chain, block_id } = {}) {
-  const { stateScanApiUrl: apiUrl } = getChainConfig(chain);
+  const { stateScanApiUrl: apiUrl, stateScanSiteUrl: siteUrl } =
+    getChainConfig(chain);
   if (!apiUrl) throw new Error(`${chain} is not configured`);
   let blockId = block_id;
 
@@ -17,5 +18,9 @@ export async function getBlockDetail({ chain, block_id } = {}) {
   const block = await request.get(
     new URL(`blocks/${encodeURIComponent(blockId)}`, apiUrl),
   );
-  return { chain, ...block };
+  return {
+    chain,
+    ...block,
+    url: new URL(`blocks/${block.height}`, siteUrl).toString(),
+  };
 }
