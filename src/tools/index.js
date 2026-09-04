@@ -3,6 +3,7 @@ export {
   registerAddressReferendaTools,
   registerAddressVotesTools,
 } from "./address/index.js";
+export { registerBlockTools } from "./block.js";
 export { registerBountiesTools } from "./bounties.js";
 export { registerDemocracyTools } from "./democracy.js";
 export { registerFellowshipTools } from "./fellowship.js";

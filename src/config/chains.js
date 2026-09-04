@@ -38,6 +38,13 @@ const chainSiteEndpoints = {
   [chains.hydration]: "https://hydration.subsquare.io",
 };
 
+const stateScanApiEndpoints = {
+  [chains.polkadot]: "https://polkadot-api.statescan.io",
+  [chains.kusama]: "https://kusama-api.statescan.io",
+  [chains.collectives]: "https://collectives-api.statescan.io",
+};
+export const stateScanChains = Object.keys(stateScanApiEndpoints);
+
 export const chainRpcUrls = {
   [chains.polkadot]: [
     "wss://rpc.polkadot.io",
@@ -86,6 +93,7 @@ export function getChainConfig(chain) {
   return {
     apiUrl: getApiUrlByChain(chain),
     siteUrl: getSiteUrlByChain(chain),
+    stateScanApiUrl: stateScanApiEndpoints[chain],
     referendaPath: isCollectivesChain(chain)
       ? COLLECTIVES_REFERENDA_PATH
       : DEFAULT_REFERENDA_PATH,

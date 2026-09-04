@@ -38,7 +38,7 @@ async function requestJson(url, { method = "GET", query = {}, body } = {}) {
   const message =
     (await response.text()).trim() || response.statusText || "Unknown error";
   throw new Error(
-    `SubSquare API request failed with status ${response.status}: ${message}`,
+    `API request failed with status ${response.status}: ${message}`,
   );
 }
 
