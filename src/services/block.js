@@ -23,7 +23,6 @@ const blockEventsQuery = `
   query GetBlockInfo($blockHeightOrHash: BlockHeightOrHash!) {
     chainBlock(blockHeightOrHash: $blockHeightOrHash) {
       events {
-        args
         indexer {
           blockHeight
           eventIndex
@@ -42,7 +41,6 @@ const blockExtrinsicsQuery = `
     chainBlock(blockHeightOrHash: $blockHeightOrHash) {
       extrinsics {
         call {
-          args
           method
           section
         }

@@ -53,7 +53,7 @@ export function registerBlockTools(server) {
     "block_list_events",
     {
       description:
-        "List StateScan events in a block, including section, method, arguments, and detail URL. Uses the latest block when block_id is omitted.",
+        "List StateScan events in a block, including section, method, and detail URL. Uses the latest block when block_id is omitted.",
       inputSchema: {
         chain,
         block_id: optionalBlockId,
