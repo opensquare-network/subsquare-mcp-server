@@ -12,7 +12,11 @@ import {
   getUserFellowshipStatistics,
   getUserFellowshipVotes,
 } from "./address.js";
-import { getIdentity, getIdentityMap } from "./identity.js";
+import {
+  createCompactIdentity,
+  getIdentity,
+  getIdentityMap,
+} from "./identity.js";
 import { formatAmount } from "../utils/amount.js";
 
 const FELLOWSHIP_MEMBERS_PATH = "fellowship/members";
@@ -206,23 +210,12 @@ function createFellowshipMember(member, coreParams, identity, blockHeight) {
   }
 
   const sourceIdentity = member.identity ?? identity;
-  let compactIdentity = null;
-  if (sourceIdentity && typeof sourceIdentity === "object") {
-    const { address, info } = sourceIdentity;
-    compactIdentity = {
-      address,
-    };
-
-    if (info && typeof info === "object") {
-      compactIdentity.info = pick(info, ["status", "display"]);
-    }
-  }
 
   return {
     address: member.address,
     rank: member.rank,
     rankInfo: compactRankInfo,
-    identity: compactIdentity,
+    identity: createCompactIdentity(sourceIdentity),
   };
 }
 

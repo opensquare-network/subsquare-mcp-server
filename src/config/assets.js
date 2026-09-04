@@ -26,6 +26,7 @@ const polkadotAssetHubAssets = Object.freeze([
   },
 ]);
 const hydrationAssets = Object.freeze([
+  { symbol: "HDX", assetId: null, decimals: 12 },
   { symbol: "HOLLAR", assetId: 222, decimals: 18 },
 ]);
 const kusamaAssets = Object.freeze([

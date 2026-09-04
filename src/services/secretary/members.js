@@ -1,12 +1,12 @@
 import { chains } from "../../config/chain.js";
 import { getChainConfig } from "../../config/chains.js";
 import { request } from "../api.js";
+import { createIdentityResolver } from "../identity.js";
 import { formatAmount } from "../../utils/amount.js";
 import {
   SECRETARY_MEMBERS_PATH,
   SECRETARY_SALARY_ASSET,
   SECRETARY_SALARY_RAW_BY_RANK,
-  createSecretaryIdentityResolver,
 } from "./common.js";
 
 export async function listSecretaryMembers() {
@@ -19,9 +19,10 @@ export async function listSecretaryMembers() {
     );
   }
 
-  const compactIdentity = await createSecretaryIdentityResolver(
-    members.map((member) => member.address),
-  );
+  const compactIdentity = await createIdentityResolver({
+    chain: chains.collectives,
+    addresses: members.map((member) => member.address),
+  });
 
   return members.map((member) => ({
     address: member.address,
