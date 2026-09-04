@@ -9,6 +9,7 @@ import {
   listTreasuryProjects,
   listTreasuryProposals,
   listTreasurySpends,
+  listTreasuryTips,
   summarizeTreasuryProject,
 } from "../../services/treasury/index.js";
 import {
@@ -47,6 +48,40 @@ const treasuryBalancesInputSchema = {
     .describe(
       "Optional DotTreasury chain. Omit to return every reported chain.",
     ),
+};
+
+const treasuryTipIdentitySchema = z
+  .object({
+    address: z.string(),
+    info: z
+      .object({
+        status: z.string().optional(),
+        display: z.string().optional(),
+      })
+      .optional(),
+  })
+  .nullable();
+
+const treasuryTipsOutputSchema = {
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  total: z.number().int().nonnegative(),
+  items: z.array(
+    z.object({
+      hash: z.string().optional(),
+      title: z.string().optional(),
+      finder: z.string().optional(),
+      finderIdentity: treasuryTipIdentitySchema,
+      beneficiary: z.string().optional(),
+      beneficiaryIdentity: treasuryTipIdentitySchema,
+      createdAt: z.string().optional(),
+      lastActivityAt: z.string().optional(),
+      commentsCount: z.number().int().nullable().optional(),
+      state: z.string().nullable(),
+      medianValue: z.union([z.string(), z.number()]).nullable(),
+      url: z.string().url().nullable(),
+    }),
+  ),
 };
 
 const treasuryAssetBalanceOutputSchema = z.object({
@@ -107,6 +142,18 @@ export function registerTreasuryTools(server) {
   );
 
   registerTreasuryProjectTools(server);
+
+  server.registerTool(
+    "treasury_list_tips",
+    {
+      description:
+        "List paginated Treasury tips on Polkadot, Kusama, or Hydration. Returns compact hashes, finder and beneficiary identities, state, raw median value, and detail URL.",
+      inputSchema: treasuryListInputSchema,
+      outputSchema: treasuryTipsOutputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async (args) => createStructuredJsonResult(await listTreasuryTips(args)),
+  );
 
   server.registerTool(
     "treasury_list_proposals",

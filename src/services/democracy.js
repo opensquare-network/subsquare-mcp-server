@@ -52,23 +52,6 @@ const listConfigs = {
       "commentsCount",
     ],
   },
-  tips: {
-    path: "treasury/tips",
-    detailPath: "treasury/tips",
-    detailId: (item) =>
-      item.height != null && item.hash ? `${item.height}_${item.hash}` : null,
-    identityFields: ["finder", "beneficiary"],
-    includesMedianValue: true,
-    itemFields: [
-      "hash",
-      "title",
-      "finder",
-      "beneficiary",
-      "createdAt",
-      "lastActivityAt",
-      "commentsCount",
-    ],
-  },
 };
 const pageFields = ["page", "pageSize", "total"];
 
@@ -97,9 +80,6 @@ function compactDemocracyItem(item, context) {
         resolveIdentity(item[field]),
       ]),
     ),
-    ...(config.includesMedianValue
-      ? { medianValue: item.onchainData?.medianValue ?? null }
-      : {}),
   };
 }
 

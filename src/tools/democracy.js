@@ -74,21 +74,6 @@ const externalsOutputSchema = {
     }),
   ),
 };
-const tipsOutputSchema = {
-  ...paginationOutputShape,
-  items: z.array(
-    z.object({
-      ...recordFields,
-      hash: z.string().optional(),
-      finder: z.string().optional(),
-      finderIdentity: identitySchema,
-      beneficiary: z.string().optional(),
-      beneficiaryIdentity: identitySchema,
-      medianValue: z.union([z.string(), z.number()]).nullable(),
-    }),
-  ),
-};
-
 function registerReferendumsTool(server) {
   server.registerTool(
     "democracy_list_referendums",
@@ -140,26 +125,8 @@ function registerExternalsTool(server) {
   );
 }
 
-function registerTipsTool(server) {
-  server.registerTool(
-    "treasury_list_tips",
-    {
-      description:
-        "List paginated Treasury tips on Polkadot, Kusama, or Hydration. Returns compact hashes, finder and beneficiary identities, state, raw median value, and detail URL.",
-      inputSchema,
-      outputSchema: tipsOutputSchema,
-      annotations: readOnlyAnnotations,
-    },
-    async (args) =>
-      createStructuredJsonResult(
-        await listDemocracyItems({ ...args, type: "tips" }),
-      ),
-  );
-}
-
 export function registerDemocracyTools(server) {
   registerReferendumsTool(server);
   registerProposalsTool(server);
   registerExternalsTool(server);
-  registerTipsTool(server);
 }

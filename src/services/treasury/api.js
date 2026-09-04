@@ -11,8 +11,18 @@ const PROJECTS_API_PATH = "treasury/status/projects";
 const TREASURY_SUMMARY_API_PATH = "overview/summary";
 const TREASURY_PROPOSALS_API_PATH = "treasury/proposals";
 const TREASURY_SPENDS_API_PATH = "treasury/spends";
+const TREASURY_TIPS_API_PATH = "treasury/tips";
 const PROJECTS_CACHE_TTL_MS = 5 * 60 * 1000;
 const TREASURY_LIST_ITEM_FIELDS = ["title", "state", "proposer", "beneficiary"];
+const TREASURY_TIP_FIELDS = [
+  "hash",
+  "title",
+  "finder",
+  "beneficiary",
+  "createdAt",
+  "lastActivityAt",
+  "commentsCount",
+];
 const TREASURY_NATIVE_ASSET_SYMBOLS = {
   [chains.polkadot]: "DOT",
   [chains.kusama]: "KSM",
@@ -171,6 +181,44 @@ export function listTreasurySpends(query) {
     createTreasurySpendListItem,
     query,
   );
+}
+
+function createTreasuryTipUrl(item, chain) {
+  if (item.height == null || !item.hash) {
+    return null;
+  }
+
+  return createTreasuryItemUrl(
+    TREASURY_TIPS_API_PATH,
+    `${item.height}_${item.hash}`,
+    chain,
+  );
+}
+
+export async function listTreasuryTips({ chain, ...query } = {}) {
+  const response = await request.get(
+    createTreasuryUrl(TREASURY_TIPS_API_PATH, chain),
+    { ...query, simple: true },
+  );
+  const items = Array.isArray(response?.items) ? response.items : [];
+  const resolveIdentity = await createIdentityResolver({
+    chain,
+    addresses: items.flatMap((item) => [item.finder, item.beneficiary]),
+  });
+
+  return {
+    page: response?.page,
+    pageSize: response?.pageSize,
+    total: response?.total,
+    items: items.map((item) => ({
+      ...pick(item, TREASURY_TIP_FIELDS),
+      state: item.state?.state ?? null,
+      finderIdentity: resolveIdentity(item.finder),
+      beneficiaryIdentity: resolveIdentity(item.beneficiary),
+      medianValue: item.onchainData?.medianValue ?? null,
+      url: createTreasuryTipUrl(item, chain),
+    })),
+  };
 }
 
 export async function getTreasuryStatus({ chain } = {}) {
