@@ -15,6 +15,8 @@ export const treasuryChains = [
   chains.hydration,
 ];
 
+export const bountyChains = [chains.polkadot, chains.kusama];
+
 const identityChains = {
   [chains.polkadot]: chains.polkadot,
   [chains.collectives]: chains.polkadot,
