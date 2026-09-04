@@ -44,6 +44,12 @@ const stateScanApiEndpoints = {
   [chains.collectives]: "https://collectives-api.statescan.io",
 };
 
+const stateScanGraphqlEndpoints = {
+  [chains.polkadot]: "https://ddd-gh-api.statescan.io/graphql",
+  [chains.kusama]: "https://ksm-gh-api.statescan.io/graphql",
+  [chains.collectives]: "https://col-gh-api.statescan.io/graphql",
+};
+
 const stateScanSiteEndpoints = {
   [chains.polkadot]: "https://polkadot.statescan.io",
   [chains.kusama]: "https://kusama.statescan.io",
@@ -101,6 +107,7 @@ export function getChainConfig(chain) {
     apiUrl: getApiUrlByChain(chain),
     siteUrl: getSiteUrlByChain(chain),
     stateScanApiUrl: stateScanApiEndpoints[chain],
+    stateScanGraphqlUrl: stateScanGraphqlEndpoints[chain],
     stateScanSiteUrl: stateScanSiteEndpoints[chain],
     referendaPath: isCollectivesChain(chain)
       ? COLLECTIVES_REFERENDA_PATH

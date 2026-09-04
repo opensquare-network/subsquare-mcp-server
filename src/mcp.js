@@ -22,7 +22,7 @@ const serverInstructions = [
   "In prose and tables, render null or missing values as —; preserve nulls in JSON or code.",
   "When an address has an optional identity, show its identity display name when available; otherwise show the address.",
   "Preserve reported numbers, precision, units (including base or smallest units), and timestamp meaning. If you convert, format, or calculate a value, label it and keep the original when available.",
-  "List tools are paginated: page starts at 1 (default 1) and page_size defaults to 25. When pagination metadata is present, report the returned page, page size, and total; suggest another page only when the metadata indicates that more records exist.",
+  "List tools are paginated; follow each tool's page description and defaults. When pagination metadata is present, report the returned page, page size, and total; suggest another page only when the metadata indicates that more records exist.",
   "Respond in the user's language unless another language is requested.",
 ].join("\n");
 
