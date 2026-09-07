@@ -1,7 +1,7 @@
-import { getChainConfig } from "../../config/chains.js";
+import { getSs58AddressInfo } from "polkadot-api";
+import { getStateScanConfig } from "../../config/chains.js";
 import { request } from "../api.js";
 import { createIdentityResolver } from "../identity.js";
-import { resolveBlockHeight } from "./block.js";
 
 const filterNames = [
   "section",
@@ -13,13 +13,6 @@ const filterNames = [
 ];
 
 function validateFilters(args) {
-  const { block_id: blockId } = args;
-  const hasBlockRange = args.block_start != null || args.block_end != null;
-  const hasDateRange = args.date_start != null || args.date_end != null;
-
-  if (blockId != null && (hasBlockRange || hasDateRange)) {
-    throw new Error("block_id cannot be combined with block or date ranges");
-  }
   if (args.block_start > args.block_end) {
     throw new Error("block_start cannot be greater than block_end");
   }
@@ -28,16 +21,27 @@ function validateFilters(args) {
   }
 }
 
+function collectAddresses(value, addresses = new Set()) {
+  if (typeof value === "string") {
+    if (getSs58AddressInfo(value).isValid) addresses.add(value);
+  } else if (value && typeof value === "object") {
+    for (const nestedValue of Object.values(value)) {
+      collectAddresses(nestedValue, addresses);
+    }
+  }
+
+  return addresses;
+}
+
 async function listBlockContents(args, path) {
   validateFilters(args);
   const {
     chain,
-    page,
-    page_size: pageSize,
+    page = 0,
+    page_size: pageSize = 10,
     time_dimension: timeDimension = "block",
   } = args;
-  const { stateScanApiUrl: apiUrl, stateScanSiteUrl: siteUrl } =
-    getChainConfig(chain);
+  const { apiUrl, siteUrl } = getStateScanConfig(chain);
   const query = {
     page,
     page_size: pageSize,
@@ -46,18 +50,23 @@ async function listBlockContents(args, path) {
 
   for (const name of filterNames) query[name] = args[name];
 
-  const hasFilters =
-    timeDimension === "date" || filterNames.some((name) => args[name] != null);
-  if (args.block_id != null || !hasFilters) {
-    const blockHeight = await resolveBlockHeight(args);
-    query.time_dimension = "block";
-    query.block_start = blockHeight;
-    query.block_end = blockHeight;
+  const result = await request.get(new URL(path, apiUrl), query);
+  const items = result?.items ?? [];
+  const addresses = [...collectAddresses(items)];
+  const resolveIdentity = await createIdentityResolver({
+    chain,
+    addresses,
+  });
+  const identities = {};
+  for (const address of addresses) {
+    const info = resolveIdentity(address)?.info;
+    if (info && Object.keys(info).length > 0) identities[address] = info;
   }
 
-  const result = await request.get(new URL(path, apiUrl), query);
-
-  return { result: { ...result, items: result?.items ?? [] }, siteUrl };
+  return {
+    result: { ...result, items, identities },
+    siteUrl,
+  };
 }
 
 export async function listBlockEvents(args = {}) {
@@ -76,18 +85,12 @@ export async function listBlockEvents(args = {}) {
 }
 
 export async function listBlockExtrinsics(args = {}) {
-  const { chain } = args;
   const { result, siteUrl } = await listBlockContents(args, "extrinsics");
-  const resolveIdentity = await createIdentityResolver({
-    chain,
-    addresses: result.items.map((extrinsic) => extrinsic.signer),
-  });
 
   return {
     ...result,
     items: result.items.map((extrinsic) => ({
       ...extrinsic,
-      signerIdentity: resolveIdentity(extrinsic.signer),
       url: new URL(
         `#/extrinsics/${extrinsic.indexer.blockHeight}-${extrinsic.indexer.extrinsicIndex}`,
         siteUrl,

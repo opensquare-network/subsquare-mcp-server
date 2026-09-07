@@ -1,4 +1,4 @@
-import { getChainConfig } from "../../config/chains.js";
+import { getStateScanConfig } from "../../config/chains.js";
 import { request } from "../api.js";
 import { createIdentityResolver } from "../identity.js";
 
@@ -38,11 +38,7 @@ async function resolveBlockId({ apiUrl, blockId, chain }) {
 }
 
 async function getBlockInfo({ chain, block_id }, query) {
-  const {
-    stateScanApiUrl: apiUrl,
-    stateScanGraphqlUrl: graphqlUrl,
-    stateScanSiteUrl: siteUrl,
-  } = getChainConfig(chain);
+  const { apiUrl, graphqlUrl, siteUrl } = getStateScanConfig(chain);
   if (!graphqlUrl) throw new Error(`${chain} is not configured`);
 
   const blockId = await resolveBlockId({ apiUrl, blockId: block_id, chain });
@@ -64,7 +60,7 @@ async function getBlockInfo({ chain, block_id }, query) {
 
 export async function resolveBlockHeight(args = {}) {
   const { chain } = args;
-  const { stateScanApiUrl: apiUrl } = getChainConfig(chain);
+  const { apiUrl } = getStateScanConfig(chain);
   const blockId = await resolveBlockId({
     apiUrl,
     blockId: args.block_id,

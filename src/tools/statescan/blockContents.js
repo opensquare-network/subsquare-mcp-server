@@ -4,7 +4,7 @@ import {
   listBlockExtrinsics,
 } from "../../services/statescan/blockContents.js";
 import { createJsonResult, readOnlyAnnotations } from "../common.js";
-import { chain, optionalBlockId } from "./block.js";
+import { chain } from "./block.js";
 
 const paginationInputShape = {
   page: z
@@ -12,14 +12,14 @@ const paginationInputShape = {
     .int()
     .nonnegative()
     .default(0)
-    .describe("StateScan page number, starts at 0 (default 0)"),
+    .describe("Zero-based page"),
   page_size: z
     .number()
     .int()
     .positive()
     .max(100)
     .default(10)
-    .describe("Items per page (default 10)"),
+    .describe("Items per page"),
 };
 const filterInputShape = {
   section: z.string().trim().min(1).optional().describe("Pallet section"),
@@ -27,7 +27,7 @@ const filterInputShape = {
   time_dimension: z
     .enum(["block", "date"])
     .default("block")
-    .describe("Filter by block height or date"),
+    .describe("Use date for date_start/date_end"),
   block_start: z.number().int().nonnegative().optional(),
   block_end: z.number().int().nonnegative().optional(),
   date_start: z
@@ -49,10 +49,9 @@ export function registerBlockContentsTools(server) {
     "block_list_events",
     {
       description:
-        "List StateScan events with optional block, section, method, block range, or date range filters. Uses the latest block when no filters are provided.",
+        "List StateScan events; identities maps known addresses to display/status.",
       inputSchema: {
         chain,
-        block_id: optionalBlockId,
         ...paginationInputShape,
         ...filterInputShape,
       },
@@ -65,10 +64,9 @@ export function registerBlockContentsTools(server) {
     "block_list_extrinsics",
     {
       description:
-        "List StateScan extrinsics with optional block, section, method, block range, or date range filters. Uses the latest block when no filters are provided.",
+        "List StateScan extrinsics; identities maps known addresses to display/status.",
       inputSchema: {
         chain,
-        block_id: optionalBlockId,
         ...paginationInputShape,
         ...filterInputShape,
       },

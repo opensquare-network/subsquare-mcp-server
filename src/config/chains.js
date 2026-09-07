@@ -22,6 +22,8 @@ const identityChains = {
   [chains.collectives]: chains.polkadot,
   [chains.hydration]: "hydradx",
   [chains.kusama]: chains.kusama,
+  [chains.polkadotAssetHub]: chains.polkadot,
+  [chains.kusamaAssetHub]: chains.kusama,
 };
 
 const chainApiEndpoints = {
@@ -42,18 +44,24 @@ const stateScanApiEndpoints = {
   [chains.polkadot]: "https://polkadot-api.statescan.io",
   [chains.kusama]: "https://kusama-api.statescan.io",
   [chains.collectives]: "https://collectives-api.statescan.io",
+  [chains.polkadotAssetHub]: "https://ahp-api.statescan.io",
+  [chains.kusamaAssetHub]: "https://statemine-api.statescan.io",
 };
 
 const stateScanGraphqlEndpoints = {
   [chains.polkadot]: "https://ddd-gh-api.statescan.io/graphql",
   [chains.kusama]: "https://ksm-gh-api.statescan.io/graphql",
   [chains.collectives]: "https://col-gh-api.statescan.io/graphql",
+  [chains.polkadotAssetHub]: "https://ahp-gh-api.statescan.io/graphql",
+  [chains.kusamaAssetHub]: "https://statemine-gh-api.statescan.io/graphql",
 };
 
 const stateScanSiteEndpoints = {
   [chains.polkadot]: "https://polkadot.statescan.io",
   [chains.kusama]: "https://kusama.statescan.io",
   [chains.collectives]: "https://collectives.statescan.io",
+  [chains.polkadotAssetHub]: "https://assethub-polkadot.statescan.io",
+  [chains.kusamaAssetHub]: "https://assethub-kusama.statescan.io",
 };
 
 export const stateScanChains = Object.keys(stateScanApiEndpoints);
@@ -92,6 +100,7 @@ function getEndpointByChain(endpoints) {
 
 const getApiUrlByChain = getEndpointByChain(chainApiEndpoints);
 const getSiteUrlByChain = getEndpointByChain(chainSiteEndpoints);
+const getStateScanApiUrlByChain = getEndpointByChain(stateScanApiEndpoints);
 
 function requireEnv(name) {
   const value = process.env[name]?.trim();
@@ -112,6 +121,14 @@ export function getChainConfig(chain) {
     referendaPath: isCollectivesChain(chain)
       ? COLLECTIVES_REFERENDA_PATH
       : DEFAULT_REFERENDA_PATH,
+  };
+}
+
+export function getStateScanConfig(chain) {
+  return {
+    apiUrl: getStateScanApiUrlByChain(chain),
+    graphqlUrl: stateScanGraphqlEndpoints[chain],
+    siteUrl: stateScanSiteEndpoints[chain],
   };
 }
 
