@@ -23,7 +23,7 @@ export function registerAccountTools(server) {
     "account_list_extrinsics",
     {
       description:
-        "List StateScan extrinsics for an account address; identities maps known addresses to display/status.",
+        "List compact account extrinsics. Call arguments are omitted; url links to details. identities maps addresses to display/status.",
       inputSchema,
       annotations: readOnlyAnnotations,
     },
@@ -34,7 +34,7 @@ export function registerAccountTools(server) {
     "account_list_transfers",
     {
       description:
-        "List StateScan transfers for an account address; identities maps known addresses to display/status.",
+        "List compact account transfers with detail URLs. identities maps addresses to display/status.",
       inputSchema,
       annotations: readOnlyAnnotations,
     },
