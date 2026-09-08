@@ -3,7 +3,7 @@ export {
   registerAddressReferendaTools,
   registerAddressVotesTools,
 } from "./address/index.js";
-export { registerBlockTools } from "./statescan/index.js";
+export { registerAccountTools, registerBlockTools } from "./statescan/index.js";
 export { registerBountiesTools } from "./bounties.js";
 export { registerDemocracyTools } from "./democracy.js";
 export { registerFellowshipTools } from "./fellowship.js";

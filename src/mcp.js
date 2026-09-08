@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import packageJson from "../package.json" with { type: "json" };
 import {
+  registerAccountTools,
   registerAddressFellowshipTools,
   registerAddressReferendaTools,
   registerAddressVotesTools,
@@ -35,6 +36,7 @@ export function createMcpServer() {
     { instructions: serverInstructions },
   );
 
+  registerAccountTools(server);
   registerAddressFellowshipTools(server);
   registerAddressReferendaTools(server);
   registerAddressVotesTools(server);
