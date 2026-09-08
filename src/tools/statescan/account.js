@@ -70,6 +70,14 @@ const assetPageSchema = z
   .passthrough()
   .nullable();
 
+const breakdownItemSchema = z
+  .object({
+    amount: balanceSchema,
+    id: z.string().nullable(),
+    reasons: z.string().nullable(),
+  })
+  .passthrough();
+
 const accountAssetsOutputSchema = {
   chain,
   address: accountAddress.describe("SS58 account address in the selected chain's format"),
@@ -84,8 +92,23 @@ const accountAssetsOutputSchema = {
             "Free balance; not necessarily transferable",
           ),
           reserved: balanceSchema,
+          lockedBalance: balanceSchema,
+          transferrable: balanceSchema,
         })
-        .passthrough(),
+        .passthrough()
+        .nullable()
+        .describe("Native balances; null when the account does not exist"),
+      lockedBreakdown: z
+        .array(breakdownItemSchema)
+        .nullable()
+        .describe("Locked balance breakdown, e.g. by staking or vesting"),
+      reservedBreakdown: z
+        .array(breakdownItemSchema)
+        .nullable()
+        .describe("Reserved balance breakdown"),
+      nonce: z.number().int().nonnegative().nullable(),
+      consumers: z.number().int().nonnegative().nullable(),
+      providers: z.number().int().nonnegative().nullable(),
     })
     .passthrough(),
   assets: assetPageSchema.describe("Local assets; null when unsupported"),

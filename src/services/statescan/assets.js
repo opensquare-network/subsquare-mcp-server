@@ -30,13 +30,40 @@ const accountAssetsQuery = `
   }
 `;
 
+const accountBalanceQuery = `
+  query GetAccountInfo($address: String!) {
+    chainAccount(address: $address) {
+      data {
+        free
+        reserved
+        lockedBalance
+        lockedBreakdown {
+          amount
+          id
+          reasons
+        }
+        reservedBreakdown {
+          amount
+          id
+        }
+        total
+        transferrable
+      }
+      detail {
+        consumers
+        nonce
+        providers
+      }
+    }
+  }
+`;
+
 const NATIVE_BALANCE_FIELDS = [
   "total",
   "free",
   "reserved",
-  "frozen",
-  "miscFrozen",
-  "feeFrozen",
+  "lockedBalance",
+  "transferrable",
 ];
 function createBalance(raw, decimals) {
   if (raw == null) return { raw: null, value: null };
@@ -110,22 +137,48 @@ function createAssetPage(result, type, siteUrl) {
   };
 }
 
+function createBreakdown(items, decimals) {
+  if (!Array.isArray(items)) {
+    return null;
+  }
+  return items.map(({ amount, id, reasons }) => ({
+    amount: createBalance(amount, decimals),
+    id: id ?? null,
+    reasons: reasons ?? null,
+  }));
+}
+
+function getChainAccountBalance(data, decimals) {
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+  return {
+    balances: Object.fromEntries(
+      NATIVE_BALANCE_FIELDS.map((field) => [
+        field,
+        createBalance(data[field], decimals),
+      ]),
+    ),
+    lockedBreakdown: createBreakdown(data.lockedBreakdown, decimals),
+    reservedBreakdown: createBreakdown(data.reservedBreakdown, decimals),
+  };
+}
+
 export async function getAccountAssets({
   chain,
   address,
   page = 0,
   page_size: pageSize = 25,
 }) {
-  const { apiUrl, graphqlUrl, siteUrl, ss58Format } = getStateScanConfig(chain);
+  const { graphqlUrl, siteUrl, ss58Format } = getStateScanConfig(chain);
   const addressCodec = AccountId(ss58Format);
   const normalizedAddress = addressCodec.dec(addressCodec.enc(address));
   const canQueryAssets = stateScanAssetChains.includes(chain);
-  const accountUrl = new URL(
-    `accounts/${encodeURIComponent(normalizedAddress)}`,
-    apiUrl,
-  );
-  const [account, assetsResult] = await Promise.all([
-    request.get(accountUrl),
+  const [balanceResult, assetsResult] = await Promise.all([
+    request.post(graphqlUrl, {
+      query: accountBalanceQuery,
+      variables: { address: normalizedAddress },
+    }),
     canQueryAssets
       ? request.post(graphqlUrl, {
           query: accountAssetsQuery,
@@ -137,21 +190,19 @@ export async function getAccountAssets({
         })
       : null,
   ]);
-  if (!account?.data || typeof account.data !== "object") {
-    throw new Error("StateScan returned no native account balance data");
-  }
   if (assetsResult?.errors?.length) {
     throw new Error(
       `StateScan assets query failed: ${assetsResult.errors.map(({ message }) => message).join("; ")}`,
     );
   }
   const nativeAsset = getNativeAsset(chain);
-  const balances = Object.fromEntries(
-    NATIVE_BALANCE_FIELDS.map((field) => [
-      field,
-      createBalance(account.data[field], nativeAsset.decimals),
-    ]),
+  const chainAccount = balanceResult?.data?.chainAccount;
+  const accountData = chainAccount?.data;
+  const accountBalance = getChainAccountBalance(
+    accountData,
+    nativeAsset.decimals,
   );
+  const detail = chainAccount?.detail ?? null;
   return {
     chain,
     address: normalizedAddress,
@@ -162,7 +213,12 @@ export async function getAccountAssets({
     native: {
       symbol: nativeAsset.symbol,
       decimals: nativeAsset.decimals,
-      balances,
+      balances: accountBalance?.balances ?? null,
+      lockedBreakdown: accountBalance?.lockedBreakdown ?? null,
+      reservedBreakdown: accountBalance?.reservedBreakdown ?? null,
+      nonce: detail?.nonce ?? null,
+      consumers: detail?.consumers ?? null,
+      providers: detail?.providers ?? null,
     },
     assets: canQueryAssets
       ? createAssetPage(assetsResult?.data?.accountAssets, "local", siteUrl)
