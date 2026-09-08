@@ -66,6 +66,19 @@ const stateScanSiteEndpoints = {
 
 export const stateScanChains = Object.keys(stateScanApiEndpoints);
 
+const chainSs58Formats = {
+  [chains.polkadot]: 0,
+  [chains.kusama]: 2,
+  [chains.collectives]: 0,
+  [chains.polkadotAssetHub]: 0,
+  [chains.kusamaAssetHub]: 2,
+};
+
+export const stateScanAssetChains = [
+  chains.polkadotAssetHub,
+  chains.kusamaAssetHub,
+];
+
 export const chainRpcUrls = {
   [chains.polkadot]: [
     "wss://rpc.polkadot.io",
@@ -129,6 +142,7 @@ export function getStateScanConfig(chain) {
     apiUrl: getStateScanApiUrlByChain(chain),
     graphqlUrl: stateScanGraphqlEndpoints[chain],
     siteUrl: stateScanSiteEndpoints[chain],
+    ss58Format: chainSs58Formats[chain],
   };
 }
 
