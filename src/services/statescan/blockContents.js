@@ -1,7 +1,6 @@
-import { getSs58AddressInfo } from "polkadot-api";
 import { getStateScanConfig } from "../../config/chains.js";
 import { request } from "../api.js";
-import { createIdentityResolver } from "../identity.js";
+import { resolveItemIdentities } from "../identity.js";
 
 const filterNames = [
   "section",
@@ -19,18 +18,6 @@ function validateFilters(args) {
   if (args.date_start > args.date_end) {
     throw new Error("date_start cannot be greater than date_end");
   }
-}
-
-function collectAddresses(value, addresses = new Set()) {
-  if (typeof value === "string") {
-    if (getSs58AddressInfo(value).isValid) addresses.add(value);
-  } else if (value && typeof value === "object") {
-    for (const nestedValue of Object.values(value)) {
-      collectAddresses(nestedValue, addresses);
-    }
-  }
-
-  return addresses;
 }
 
 async function listBlockContents(args, path) {
@@ -52,16 +39,7 @@ async function listBlockContents(args, path) {
 
   const result = await request.get(new URL(path, apiUrl), query);
   const items = result?.items ?? [];
-  const addresses = [...collectAddresses(items)];
-  const resolveIdentity = await createIdentityResolver({
-    chain,
-    addresses,
-  });
-  const identities = {};
-  for (const address of addresses) {
-    const info = resolveIdentity(address)?.info;
-    if (info && Object.keys(info).length > 0) identities[address] = info;
-  }
+  const identities = await resolveItemIdentities(chain, items);
 
   return {
     result: { ...result, items, identities },
