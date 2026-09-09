@@ -9,6 +9,7 @@ import {
   registerBountiesTools,
   registerCouncilTools,
   registerDelegationTools,
+  registerCoretimeTools,
   registerDemocracyTools,
   registerFellowshipTools,
   registerIdentityTools,
@@ -47,6 +48,7 @@ export function createMcpServer() {
   registerBountiesTools(server);
   registerCouncilTools(server);
   registerDelegationTools(server);
+  registerCoretimeTools(server);
   registerDemocracyTools(server);
   registerFellowshipTools(server);
   registerIdentityTools(server);

@@ -22,6 +22,13 @@ export const treasuryChains = [
 
 export const bountyChains = [chains.polkadot, chains.kusama];
 
+const coretimeGraphqlEndpoints = {
+  [chains.polkadot]: "https://polkadot-gh-api.subsquare.io/graphql",
+  [chains.kusama]: "https://kusama-gh-api.subsquare.io/graphql",
+};
+
+export const coretimeChains = Object.keys(coretimeGraphqlEndpoints);
+
 const identityChains = {
   [chains.polkadot]: chains.polkadot,
   [chains.collectives]: chains.polkadot,
@@ -104,6 +111,7 @@ function getEndpointByChain(endpoints) {
 }
 
 const getApiUrlByChain = getEndpointByChain(chainApiEndpoints);
+export const getCoretimeGraphqlUrl = getEndpointByChain(coretimeGraphqlEndpoints);
 const getSiteUrlByChain = getEndpointByChain(chainSiteEndpoints);
 const getStateScanApiUrlByChain = getEndpointByChain(stateScanApiEndpoints);
 

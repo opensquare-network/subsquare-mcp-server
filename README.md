@@ -40,7 +40,20 @@ http://127.0.0.1:3210/mcp
 
 ## MCP Tools
 
-The server exposes **46 read-only tools** through the `/mcp` endpoint.
+The server exposes **48 read-only tools** through the `/mcp` endpoint.
+
+### Coretime
+
+| Tool | Description | Chains |
+| --- | --- | --- |
+| `list_coretime_sales` | Locate sale IDs with compact cycle records; `limit` defaults to 10, `offset` to 0. | Polkadot, Kusama |
+| `get_coretime_sale` | Get a cycle overview; omit `saleId` for the current cycle. | Polkadot, Kusama |
+
+Both tools require `chain`. Detail flags `includePurchases`, `includeRenewals`, and `includeTimeline` default to false. Purchase and renewal pages use independent `purchasesLimit`/`purchasesOffset` and `renewalsLimit`/`renewalsOffset` (defaults 20/0, maximum limit 100). Timeline events include `args` and are not paginated.
+
+Amounts remain raw strings with top-level `symbol` and `decimals`. `regionBegin`/`regionEnd` are timeslices, not Unix times; indexer `blockTime` values are event timestamps in milliseconds. Detail `infoUpdatedAt` preserves the sale info update chain, block height, and time.
+
+Example: `get_coretime_sale({"chain":"polkadot","saleId":20,"includePurchases":true})`.
 
 ### OpenGov
 
