@@ -97,6 +97,7 @@ Council and Technical Committee proposals on Polkadot and Kusama are historical 
 | `treasury_list_proposals` | List Treasury proposals with active and total counts. | Polkadot, Kusama, Hydration |
 | `treasury_list_spends` | List Treasury spends with active and total counts. | Polkadot, Kusama, Hydration |
 | `treasury_get_status` | Summarize Treasury activity counts. | Polkadot, Kusama, Hydration |
+| `get_treasury_burn` | Get cumulative burns, paginated records, and optional history (newest first). Requires `chain`; `page` defaults to 1, `pageSize` to 25 (maximum 100), and `includeHistory` to false. | Polkadot, Kusama, Hydration |
 | `treasury_get_balances` | Get Treasury balances for one or all supported chains. | Polkadot, Kusama, Hydration, Acala, Karura, Bifrost, Astar |
 | `bounties_list_bounties` | List bounties with active and total counts. | Polkadot, Kusama |
 | `bounties_get_bounty` | Get a bounty's proposer, curator, value, and content. | Polkadot, Kusama |
