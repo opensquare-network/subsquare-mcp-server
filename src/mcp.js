@@ -7,11 +7,13 @@ import {
   registerAddressVotesTools,
   registerBlockTools,
   registerBountiesTools,
+  registerCouncilTools,
   registerDemocracyTools,
   registerFellowshipTools,
   registerIdentityTools,
   registerReferendaTools,
   registerSecretaryTools,
+  registerTechcommTools,
   registerTreasuryTools,
 } from "./tools/index.js";
 
@@ -42,11 +44,13 @@ export function createMcpServer() {
   registerAddressVotesTools(server);
   registerBlockTools(server);
   registerBountiesTools(server);
+  registerCouncilTools(server);
   registerDemocracyTools(server);
   registerFellowshipTools(server);
   registerIdentityTools(server);
   registerReferendaTools(server);
   registerSecretaryTools(server);
+  registerTechcommTools(server);
   registerTreasuryTools(server);
   return server;
 }

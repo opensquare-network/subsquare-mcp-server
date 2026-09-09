@@ -9,6 +9,11 @@ export const democracyChains = [
   chains.kusama,
   chains.hydration,
 ];
+export const collectiveChains = [
+  chains.polkadot,
+  chains.kusama,
+  chains.hydration,
+];
 export const treasuryChains = [
   chains.polkadot,
   chains.kusama,
