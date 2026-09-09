@@ -40,7 +40,7 @@ http://127.0.0.1:3210/mcp
 
 ## MCP Tools
 
-The server exposes **43 read-only tools** through the `/mcp` endpoint.
+The server exposes **46 read-only tools** through the `/mcp` endpoint.
 
 ### OpenGov
 
@@ -51,8 +51,15 @@ The server exposes **43 read-only tools** through the `/mcp` endpoint.
 | `opengov_referenda_summary` | Get referendum statistics. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `opengov_list_referenda_by_address` | List referenda submitted by an address. | Polkadot, Kusama, Hydration |
 | `opengov_list_votes_by_address` | List referendum votes cast by an address. | Polkadot, Kusama, Hydration |
+| `list_delegates` | List delegates with delegation statistics and available profiles. | Polkadot, Kusama, Hydration |
+| `get_delegate_delegators` | Get delegation relationships received by a delegate, paginated with caching and an optional track filter. | Polkadot, Kusama, Hydration |
+| `list_delegations` | List delegation relationships for one required OpenGov track. | Polkadot, Kusama, Hydration |
 
 On Polkadot Collectives, the first three tools use Fellowship referenda. Asset Hub SubSquare REST endpoints are not currently configured.
+
+`list_delegations(chain, track_id, page, page_size)` requires a nonnegative integer `track_id` (including track 0). Pagination starts at page 1, defaults to 25 items, and allows up to 100 items per page. It returns `items`, `page`, `pageSize`, and `total`; each item contains `delegator`, `delegatee`, `track_id`, `balance`, `conviction`, and `votes`. Balance and votes retain the API's base-unit strings without numeric conversion.
+
+`list_delegates(chain, page, page_size)` uses the same pagination defaults and returns the API's delegate records, including addresses, delegation statistics, and available profiles. `get_delegate_delegators(chain, address, track_id?, page, page_size)` paginates the full upstream list server-side (the upstream endpoint ignores pagination and track filtering): the full result is fetched once and cached for 5 minutes per chain and address, then sliced locally. It defaults to 100 items per page (max 200) and, alongside the paginated `items`, returns `identities` (addresses mapped to display/status), `summary` (delegation count, unique delegator count, track count, and total balance/votes in base units), and the same relationship fields as `list_delegations`. `list_delegations` responses also include an `identities` map.
 
 ### Democracy, Council, and Technical Committee
 

@@ -6,6 +6,7 @@ export {
 export { registerAccountTools, registerBlockTools } from "./statescan/index.js";
 export { registerBountiesTools } from "./bounties.js";
 export { registerCouncilTools } from "./council.js";
+export { registerDelegationTools } from "./delegation.js";
 export { registerDemocracyTools } from "./democracy.js";
 export { registerFellowshipTools } from "./fellowship.js";
 export { registerIdentityTools } from "./identity.js";
