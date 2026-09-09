@@ -111,7 +111,9 @@ function getEndpointByChain(endpoints) {
 }
 
 const getApiUrlByChain = getEndpointByChain(chainApiEndpoints);
-export const getCoretimeGraphqlUrl = getEndpointByChain(coretimeGraphqlEndpoints);
+export const getCoretimeGraphqlUrl = getEndpointByChain(
+  coretimeGraphqlEndpoints,
+);
 const getSiteUrlByChain = getEndpointByChain(chainSiteEndpoints);
 const getStateScanApiUrlByChain = getEndpointByChain(stateScanApiEndpoints);
 

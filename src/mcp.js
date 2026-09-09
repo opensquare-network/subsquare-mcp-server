@@ -17,6 +17,7 @@ import {
   registerSecretaryTools,
   registerTechcommTools,
   registerTreasuryTools,
+  registerVestingTools,
 } from "./tools/index.js";
 
 const serverInstructions = [
@@ -56,5 +57,6 @@ export function createMcpServer() {
   registerSecretaryTools(server);
   registerTechcommTools(server);
   registerTreasuryTools(server);
+  registerVestingTools(server);
   return server;
 }
