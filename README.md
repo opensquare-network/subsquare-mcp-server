@@ -49,28 +49,12 @@ The server exposes **51 read-only tools** through the `/mcp` endpoint.
 | `get_account_vesting` | Get an account's Vesting lock, unlockable amount, and schedules with release end heights. | Polkadot Asset Hub, Kusama Asset Hub |
 | `list_vesting_accounts` | List accounts with Vesting schedules, globally sorted by unlockable amount by default. | Polkadot Asset Hub, Kusama Asset Hub |
 
-Both tools require `chain`; `get_account_vesting` also requires `address`. Use `polkadotAssetHub` for Polkadot/DOT vesting and `kusamaAssetHub` for Kusama/KSM vesting. Results use one finalized snapshot; `calculationHeight`, `startingBlock`, and `endingBlock` are relay-chain heights.
-
-Amounts are integer strings in smallest units, with `symbol` and `decimals`. `unlockable` is `max(currentBalanceInLock - totalLockedNow, 0)`; per-schedule `vested` includes amounts already unlocked. An account without schedules or a Vesting lock returns zero totals and an empty array.
-
-Example: `get_account_vesting({"chain":"polkadotAssetHub","address":"..."})`.
-
-`list_vesting_accounts` accepts `limit` (default 25, maximum 100), `cursor`, `sortBy` (default `unlockable`), `order` (default `desc`), and an optional case-sensitive `address` substring filter. Sort fields are `unlockable`, `currentBalanceInLock`, `totalVesting`, `totalLockedNow`, `schedulesCount`, and `account`; ties use account ascending. All schedules and balance locks are read before sorting and pagination. First pages share a one-minute cache. Pass `nextCursor` with unchanged chain, sorting, and filter to continue the same snapshot; null marks the last page. Cursors expire after five minutes and may expire earlier on cache eviction or server restart. List items omit schedule details; `chain`, `calculationHeight`, `symbol`, and `decimals` are shared at the top level.
-
-Example: `list_vesting_accounts({"chain":"polkadotAssetHub","limit":10,"sortBy":"unlockable","order":"desc"})`.
-
 ### Coretime
 
 | Tool | Description | Chains |
 | --- | --- | --- |
-| `list_coretime_sales` | Locate sale IDs with compact cycle records; `limit` defaults to 10, `offset` to 0. | Polkadot, Kusama |
-| `get_coretime_sale` | Get a cycle overview; omit `saleId` for the current cycle. | Polkadot, Kusama |
-
-Both tools require `chain`. Detail flags `includePurchases`, `includeRenewals`, and `includeTimeline` default to false. Purchase and renewal pages use independent `purchasesLimit`/`purchasesOffset` and `renewalsLimit`/`renewalsOffset` (defaults 20/0, maximum limit 100). Timeline events include `args` and are not paginated.
-
-Amounts remain raw strings with top-level `symbol` and `decimals`. `regionBegin`/`regionEnd` are timeslices, not Unix times; indexer `blockTime` values are event timestamps in milliseconds. Detail `infoUpdatedAt` preserves the sale info update chain, block height, and time.
-
-Example: `get_coretime_sale({"chain":"polkadot","saleId":20,"includePurchases":true})`.
+| `list_coretime_sales` | List Coretime sale cycles with compact records. | Polkadot, Kusama |
+| `get_coretime_sale` | Get a Coretime sale cycle overview. | Polkadot, Kusama |
 
 ### OpenGov
 
@@ -82,14 +66,8 @@ Example: `get_coretime_sale({"chain":"polkadot","saleId":20,"includePurchases":t
 | `opengov_list_referenda_by_address` | List referenda submitted by an address. | Polkadot, Kusama, Hydration |
 | `opengov_list_votes_by_address` | List referendum votes cast by an address. | Polkadot, Kusama, Hydration |
 | `list_delegates` | List delegates with delegation statistics and available profiles. | Polkadot, Kusama, Hydration |
-| `get_delegate_delegators` | Get delegation relationships received by a delegate, paginated with caching and an optional track filter. | Polkadot, Kusama, Hydration |
+| `get_delegate_delegators` | List a delegate's delegators with summary statistics. | Polkadot, Kusama, Hydration |
 | `list_delegations` | List delegation relationships for one required OpenGov track. | Polkadot, Kusama, Hydration |
-
-On Polkadot Collectives, the first three tools use Fellowship referenda. Asset Hub SubSquare REST endpoints are not currently configured.
-
-`list_delegations(chain, track_id, page, page_size)` requires a nonnegative integer `track_id` (including track 0). Pagination starts at page 1, defaults to 25 items, and allows up to 100 items per page. It returns `items`, `page`, `pageSize`, and `total`; each item contains `delegator`, `delegatee`, `track_id`, `balance`, `conviction`, and `votes`. Balance and votes retain the API's base-unit strings without numeric conversion.
-
-`list_delegates(chain, page, page_size)` uses the same pagination defaults and returns the API's delegate records, including addresses, delegation statistics, and available profiles. `get_delegate_delegators(chain, address, track_id?, page, page_size)` paginates the full upstream list server-side (the upstream endpoint ignores pagination and track filtering): the full result is fetched once and cached for 5 minutes per chain and address, then sliced locally. It defaults to 100 items per page (max 200) and, alongside the paginated `items`, returns `identities` (addresses mapped to display/status), `summary` (delegation count, unique delegator count, track count, and total balance/votes in base units), and the same relationship fields as `list_delegations`. `list_delegations` responses also include an `identities` map.
 
 ### Democracy, Council, and Technical Committee
 
@@ -102,8 +80,6 @@ On Polkadot Collectives, the first three tools use Fellowship referenda. Asset H
 | `techcomm_list_proposals` | List Technical Committee proposals with compact fields and detail URLs. | Polkadot, Kusama, Hydration |
 | `techcomm_list_members` | Query current Technical Committee member addresses from chain storage. | Hydration |
 
-Council and Technical Committee proposals on Polkadot and Kusama are historical archives.
-
 ### Treasury and Bounties
 
 | Tool | Description | Chains |
@@ -114,14 +90,12 @@ Council and Technical Committee proposals on Polkadot and Kusama are historical 
 | `treasury_list_proposals` | List Treasury proposals with active and total counts. | Polkadot, Kusama, Hydration |
 | `treasury_list_spends` | List Treasury spends with active and total counts. | Polkadot, Kusama, Hydration |
 | `treasury_get_status` | Summarize Treasury activity counts. | Polkadot, Kusama, Hydration |
-| `get_treasury_burn` | Get cumulative burns, paginated records, and optional history (newest first). Requires `chain`; `page` defaults to 1, `pageSize` to 25 (maximum 100), and `includeHistory` to false. | Polkadot, Kusama, Hydration |
+| `get_treasury_burn` | Get cumulative Treasury burns, paginated records, and optional history. | Polkadot, Kusama, Hydration |
 | `treasury_get_balances` | Get Treasury balances for one or all supported chains. | Polkadot, Kusama, Hydration, Acala, Karura, Bifrost, Astar |
 | `bounties_list_bounties` | List bounties with active and total counts. | Polkadot, Kusama |
 | `bounties_get_bounty` | Get a bounty's proposer, curator, value, and content. | Polkadot, Kusama |
 
 ### Polkadot Fellowship
-
-These tools query Polkadot Fellowship. Treasury and salary balances are held on Polkadot Asset Hub.
 
 | Tool | Description |
 | --- | --- |
@@ -141,8 +115,6 @@ These tools query Polkadot Fellowship. Treasury and salary balances are held on 
 | `list_fellowship_salary_claimants` | List all salary claimants with claimed cycles and totals. |
 
 ### Polkadot Secretary
-
-These tools query Polkadot Secretary on Polkadot Collectives.
 
 | Tool | Description | Chains |
 | --- | --- | --- |
