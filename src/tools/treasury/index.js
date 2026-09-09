@@ -1,10 +1,11 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import { treasuryChains } from "../../config/chains.js";
 import {
   dotTreasuryChains,
   getTreasuryBalances,
 } from "../../services/dotreasury.js";
 import {
+  getTreasuryBurn,
   getTreasuryStatus,
   listTreasuryProjects,
   listTreasuryProposals,
@@ -15,6 +16,8 @@ import {
 import {
   createJsonResult,
   createStructuredJsonResult,
+  page,
+  pageSize,
   readOnlyAnnotations,
 } from "../common.js";
 import { registerTreasuryProjectTools } from "./projects.js";
@@ -26,19 +29,8 @@ const treasuryChain = z
 const treasuryStatusInputSchema = { chain: treasuryChain };
 const treasuryListInputSchema = {
   chain: treasuryChain,
-  page: z
-    .number()
-    .int()
-    .positive()
-    .default(1)
-    .describe("Page number, starts at 1 (default 1)"),
-  page_size: z
-    .number()
-    .int()
-    .positive()
-    .max(100)
-    .default(25)
-    .describe("Items per page (default 25)"),
+  page,
+  page_size: pageSize,
 };
 
 const treasuryBalancesInputSchema = {
@@ -48,6 +40,16 @@ const treasuryBalancesInputSchema = {
     .describe(
       "Optional DotTreasury chain. Omit to return every reported chain.",
     ),
+};
+
+const treasuryBurnInputSchema = {
+  chain: treasuryChain,
+  page,
+  pageSize,
+  includeHistory: z
+    .boolean()
+    .default(false)
+    .describe("Include burn history, ordered newest first (default false)"),
 };
 
 const treasuryTipIdentitySchema = z
@@ -127,6 +129,17 @@ const treasuryBalancesOutputSchema = {
 };
 
 export function registerTreasuryTools(server) {
+  server.registerTool(
+    "get_treasury_burn",
+    {
+      description:
+        "Get total Treasury burns, compact paginated records, and optional history (newest first). Amounts are raw; treasuryBalance is Remnant. Block heights and times are returned directly on each record.",
+      inputSchema: treasuryBurnInputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async (args) => createJsonResult(await getTreasuryBurn(args)),
+  );
+
   server.registerTool(
     "treasury_list_projects",
     {
