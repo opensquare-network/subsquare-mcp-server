@@ -47,6 +47,10 @@ function getAssets(chain) {
   return [];
 }
 
+export function getNativeAsset(chain) {
+  return getAssets(chain).find((asset) => asset.assetId === null) ?? null;
+}
+
 export function getAsset(chain, symbol) {
   if (typeof symbol !== "string") {
     return null;

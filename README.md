@@ -40,7 +40,24 @@ http://127.0.0.1:3210/mcp
 
 ## MCP Tools
 
-The server exposes **48 read-only tools** through the `/mcp` endpoint.
+The server exposes **51 read-only tools** through the `/mcp` endpoint.
+
+### Vesting
+
+| Tool | Description | Chains |
+| --- | --- | --- |
+| `get_account_vesting` | Get an account's Vesting lock, unlockable amount, and schedules with release end heights. | Polkadot Asset Hub, Kusama Asset Hub |
+| `list_vesting_accounts` | List accounts with Vesting schedules, globally sorted by unlockable amount by default. | Polkadot Asset Hub, Kusama Asset Hub |
+
+Both tools require `chain`; `get_account_vesting` also requires `address`. Use `polkadotAssetHub` for Polkadot/DOT vesting and `kusamaAssetHub` for Kusama/KSM vesting. Results use one finalized snapshot; `calculationHeight`, `startingBlock`, and `endingBlock` are relay-chain heights.
+
+Amounts are integer strings in smallest units, with `symbol` and `decimals`. `unlockable` is `max(currentBalanceInLock - totalLockedNow, 0)`; per-schedule `vested` includes amounts already unlocked. An account without schedules or a Vesting lock returns zero totals and an empty array.
+
+Example: `get_account_vesting({"chain":"polkadotAssetHub","address":"..."})`.
+
+`list_vesting_accounts` accepts `limit` (default 25, maximum 100), `cursor`, `sortBy` (default `unlockable`), `order` (default `desc`), and an optional case-sensitive `address` substring filter. Sort fields are `unlockable`, `currentBalanceInLock`, `totalVesting`, `totalLockedNow`, `schedulesCount`, and `account`; ties use account ascending. All schedules and balance locks are read before sorting and pagination. First pages share a one-minute cache. Pass `nextCursor` with unchanged chain, sorting, and filter to continue the same snapshot; null marks the last page. Cursors expire after five minutes and may expire earlier on cache eviction or server restart. List items omit schedule details; `chain`, `calculationHeight`, `symbol`, and `decimals` are shared at the top level.
+
+Example: `list_vesting_accounts({"chain":"polkadotAssetHub","limit":10,"sortBy":"unlockable","order":"desc"})`.
 
 ### Coretime
 
