@@ -21,6 +21,7 @@ import { formatAmount } from "../utils/amount.js";
 
 const FELLOWSHIP_MEMBERS_PATH = "fellowship/members";
 const FELLOWSHIP_FEEDS_PATH = "fellowship/feeds";
+const FELLOWSHIP_APPLICATIONS_PATH = "fellowship/applications";
 const FELLOWSHIP_CORE_PARAMS_PATH = "fellowship/core/params";
 const SCAN_HEIGHT_PATH = "inspect/scan-height";
 const HOLLAR_SALARY_START_BLOCK = 9_247_655;
@@ -80,8 +81,7 @@ const FEED_MEMBER_INFO_FIELDS = ["rank", "isActive"];
 
 function getFellowshipSalaryAsset(blockHeight) {
   const symbol =
-    Number.isInteger(blockHeight) &&
-    blockHeight >= HOLLAR_SALARY_START_BLOCK
+    Number.isInteger(blockHeight) && blockHeight >= HOLLAR_SALARY_START_BLOCK
       ? "HOLLAR"
       : "USDT";
 
@@ -161,8 +161,47 @@ export async function listFellowshipFeeds(query = {}) {
 
   return {
     ...pick(feeds, HISTORY_PAGE_FIELDS),
-    items: Array.isArray(feeds?.items)
-      ? feeds.items.map(compactFeedItem)
+    items: Array.isArray(feeds?.items) ? feeds.items.map(compactFeedItem) : [],
+  };
+}
+
+export async function listFellowshipApplications({ page, page_size } = {}) {
+  const { apiUrl, siteUrl } = getChainConfig(chains.collectives);
+  const applications = await request.get(
+    new URL(FELLOWSHIP_APPLICATIONS_PATH, apiUrl),
+    { page, page_size },
+  );
+
+  return {
+    // The endpoint echoes a "last" page back verbatim; report the resolved
+    // last page number instead so consumers always get numeric pagination.
+    page:
+      page === "last" &&
+      Number.isInteger(applications?.total) &&
+      Number.isInteger(applications?.pageSize)
+        ? Math.max(Math.ceil(applications.total / applications.pageSize), 1)
+        : applications?.page,
+    pageSize: applications?.pageSize,
+    total: applications?.total,
+    items: Array.isArray(applications?.items)
+      ? applications.items.map((application) => ({
+          ...pick(application, [
+            "applicationUid",
+            "title",
+            "applicant",
+            "proposer",
+            "status",
+            "createdAt",
+            "lastActivityAt",
+            "commentsCount",
+          ]),
+          url: new URL(
+            `fellowship/applications/${encodeURIComponent(
+              application.applicationUid,
+            )}`,
+            siteUrl,
+          ).toString(),
+        }))
       : [],
   };
 }
