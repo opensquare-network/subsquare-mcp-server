@@ -11,6 +11,7 @@ export { registerCoretimeTools } from "./coretime.js";
 export { registerDemocracyTools } from "./democracy.js";
 export { registerFellowshipTools } from "./fellowship.js";
 export { registerIdentityTools } from "./identity.js";
+export { registerPostsTools } from "./posts.js";
 export { registerReferendaTools } from "./referenda.js";
 export { registerSecretaryTools } from "./secretary/index.js";
 export { registerTechcommTools } from "./techcomm.js";

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   getFellowshipMemberDetail,
+  listFellowshipApplications,
   listFellowshipFeeds,
   listFellowshipMembers,
 } from "../services/fellowship.js";
@@ -184,6 +185,36 @@ export function registerFellowshipTools(server) {
 
   registerFellowshipTreasuryTools(server);
   registerFellowshipStatisticsTools(server);
+
+  server.registerTool(
+    "fellowship_list_applications",
+    {
+      description:
+        "List paginated Polkadot Technical Fellowship membership applications on Polkadot Collectives, with applicant, status, and detail URL.",
+      inputSchema: paginationInputShape,
+      outputSchema: {
+        page: z.number().int().positive(),
+        pageSize: z.number().int().positive(),
+        total: z.number().int().nonnegative(),
+        items: z.array(
+          z.object({
+            applicationUid: z.string().optional(),
+            title: z.string().optional(),
+            applicant: z.string().optional(),
+            proposer: z.string().optional(),
+            status: z.string().nullable().optional(),
+            createdAt: z.string().optional(),
+            lastActivityAt: z.string().optional(),
+            commentsCount: z.number().int().nullable().optional(),
+            url: z.string().url().nullable(),
+          }),
+        ),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async (args) =>
+      createStructuredJsonResult(await listFellowshipApplications(args)),
+  );
 
   server.registerTool(
     "fellowship_list_members",

@@ -22,6 +22,13 @@ export const treasuryChains = [
 
 export const bountyChains = [chains.polkadot, chains.kusama];
 
+export const postChains = [
+  chains.polkadot,
+  chains.kusama,
+  chains.collectives,
+  chains.hydration,
+];
+
 const coretimeGraphqlEndpoints = {
   [chains.polkadot]: "https://polkadot-gh-api.subsquare.io/graphql",
   [chains.kusama]: "https://kusama-gh-api.subsquare.io/graphql",

@@ -40,7 +40,14 @@ http://127.0.0.1:3210/mcp
 
 ## MCP Tools
 
-The server exposes **51 read-only tools** through the `/mcp` endpoint.
+The server exposes **53 read-only tools** through the `/mcp` endpoint.
+
+### Posts
+
+| Tool | Description | Chains |
+| --- | --- | --- |
+| `posts_list_posts` | List discussion posts with pagination, exact label filtering, and a simple mode omitting body and poll fields. | Polkadot, Kusama, Polkadot Collectives, Hydration |
+| `posts_get_post` | Get one discussion post by uid with full markdown content and metadata. | Polkadot, Kusama, Polkadot Collectives, Hydration |
 
 ### Vesting
 
@@ -100,6 +107,7 @@ The server exposes **51 read-only tools** through the `/mcp` endpoint.
 | Tool | Description |
 | --- | --- |
 | `fellowship_list_feeds` | Browse the chronological Fellowship activity feed. |
+| `fellowship_list_applications` | List Fellowship membership applications with applicant, status, and detail URLs. |
 | `fellowship_list_members` | List current members and rank-0 candidates. |
 | `fellowship_get_member_detail` | Get a member profile, evidence, salary, referendum and voting histories, and statistics. |
 | `fellowship_list_referenda_by_address` | List Fellowship referenda submitted by an address. |
