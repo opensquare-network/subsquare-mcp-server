@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { subsquareApiChains } from "../config/chains.js";
+import { subsquareApiChains } from "../../config/chains.js";
 import {
   getReferenda,
   getReferendaSummary,
   getReferendum,
   listReferendaTracks,
-} from "../services/referenda.js";
+} from "../../services/referenda/index.js";
 import {
   chain,
   createJsonResult,
@@ -13,7 +13,8 @@ import {
   paginationInputShape,
   readOnlyAnnotations,
   simple,
-} from "./common.js";
+} from "../common.js";
+import { registerReferendaCommentTools } from "./comments.js";
 
 const activeStates = [
   "Preparing",
@@ -65,6 +66,8 @@ const referendaListInputSchema = {
 };
 
 export function registerReferendaTools(server) {
+  registerReferendaCommentTools(server);
+
   server.registerTool(
     "opengov_list_tracks",
     {
