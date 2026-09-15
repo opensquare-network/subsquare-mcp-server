@@ -1,6 +1,6 @@
-import { isCollectivesChain } from "../config/chain.js";
-import { getChainConfig } from "../config/chains.js";
-import { request } from "./api.js";
+import { isCollectivesChain } from "../../config/chain.js";
+import { getChainConfig } from "../../config/chains.js";
+import { request } from "../api.js";
 
 const OPENGOV_TRACK_PATHS = {
   summary: "gov2/tracks/summary",
