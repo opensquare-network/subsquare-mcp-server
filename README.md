@@ -40,7 +40,7 @@ http://127.0.0.1:3210/mcp
 
 ## MCP Tools
 
-The server exposes **53 read-only tools** through the `/mcp` endpoint.
+The server exposes **55 read-only tools** through the `/mcp` endpoint.
 
 ### Posts
 
@@ -67,6 +67,7 @@ The server exposes **53 read-only tools** through the `/mcp` endpoint.
 
 | Tool | Description | Chains |
 | --- | --- | --- |
+| `opengov_list_tracks` | List governance track IDs, names, active referendum counts, and detail URLs. Collectives returns Fellowship tracks. | Polkadot, Kusama, Polkadot Collectives, Hydration |
 | `opengov_list_referenda` | List and filter referenda. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `opengov_referendum_detail` | Get a referendum's full details. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `opengov_referenda_summary` | Get referendum statistics. | Polkadot, Kusama, Hydration, Polkadot Collectives |

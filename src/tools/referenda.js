@@ -1,12 +1,15 @@
 import { z } from "zod";
+import { subsquareApiChains } from "../config/chains.js";
 import {
   getReferenda,
   getReferendaSummary,
   getReferendum,
+  listReferendaTracks,
 } from "../services/referenda.js";
 import {
   chain,
   createJsonResult,
+  createStructuredJsonResult,
   paginationInputShape,
   readOnlyAnnotations,
   simple,
@@ -62,6 +65,43 @@ const referendaListInputSchema = {
 };
 
 export function registerReferendaTools(server) {
+  server.registerTool(
+    "opengov_list_tracks",
+    {
+      description:
+        "List governance track IDs, names, active referendum counts, and SubSquare detail URLs. On collectives, returns Fellowship tracks.",
+      inputSchema: {
+        chain: z
+          .enum(subsquareApiChains)
+          .describe(
+            "Governance chain to query: polkadot, kusama, collectives, or hydration",
+          ),
+      },
+      outputSchema: {
+        tracks: z.array(
+          z.object({
+            id: z.number().int().nonnegative().describe("Governance track ID"),
+            name: z.string().describe("Governance track name"),
+            activeCount: z
+              .number()
+              .int()
+              .nonnegative()
+              .nullable()
+              .describe(
+                "Number of active referenda on this track, or null when unavailable",
+              ),
+            url: z
+              .string()
+              .url()
+              .describe("SubSquare page for this governance track"),
+          }),
+        ),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async (args) => createStructuredJsonResult(await listReferendaTracks(args)),
+  );
+
   server.registerTool(
     "opengov_list_referenda",
     {

@@ -52,6 +52,8 @@ const chainApiEndpoints = {
   [chains.hydration]: "https://hydration-api.subsquare.io",
 };
 
+export const subsquareApiChains = Object.keys(chainApiEndpoints);
+
 const chainSiteEndpoints = {
   [chains.polkadot]: "https://polkadot.subsquare.io",
   [chains.kusama]: "https://kusama.subsquare.io",
