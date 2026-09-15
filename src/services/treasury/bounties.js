@@ -4,6 +4,10 @@ import { chains } from "../../config/chain.js";
 import { request } from "../api.js";
 import { createIdentityResolver } from "../identity.js";
 import {
+  getMultiAssetBountyBalance,
+  getNativeBountyBalance,
+} from "./bountyBalance.js";
+import {
   TREASURY_LIST_ITEM_FIELDS,
   TREASURY_NATIVE_ASSET_SYMBOLS,
   createTreasuryItemUrl,
@@ -13,6 +17,7 @@ import {
 } from "./common.js";
 
 const BOUNTIES_API_PATH = "treasury/bounties";
+const MULTI_ASSET_BOUNTIES_API_PATH = "treasury/multi-asset-bounties";
 
 function getBountyAsset(chain) {
   return getAsset(chain, TREASURY_NATIVE_ASSET_SYMBOLS[chain]);
@@ -43,23 +48,32 @@ export function listBounties(query) {
   );
 }
 
+export function getBountyStatistics({
+  chain = chains.polkadot,
+  bounty_index,
+} = {}) {
+  return request.get(
+    createTreasuryUrl(`${BOUNTIES_API_PATH}/${bounty_index}/statistics`, chain),
+  );
+}
+
 export async function getBounty({
   chain = chains.polkadot,
   bounty_index,
 } = {}) {
-  if (!Number.isInteger(bounty_index) || bounty_index < 0) {
-    throw new Error("bounty_index must be a non-negative integer");
-  }
-
   const bounty = await request.get(
     createTreasuryUrl(`${BOUNTIES_API_PATH}/${bounty_index}`, chain),
   );
-
   const curator = bounty?.onchainData?.meta?.status?.active?.curator ?? null;
 
   const resolveIdentity = await createIdentityResolver({
     chain,
     addresses: [bounty.proposer, bounty.beneficiary, curator],
+  });
+
+  const balance = await getNativeBountyBalance({
+    account: bounty.onchainData?.address,
+    chain,
   });
 
   return {
@@ -73,7 +87,50 @@ export async function getBounty({
       bounty.onchainData?.value,
       getBountyAsset(chain),
     ),
+    balance,
     content: bounty.content ?? null,
     url: createTreasuryItemUrl(BOUNTIES_API_PATH, bounty.bountyIndex, chain),
+  };
+}
+
+export async function getMultiAssetBounty({
+  chain = chains.polkadot,
+  bounty_index,
+} = {}) {
+  const bounty = await request.get(
+    createTreasuryUrl(
+      `${MULTI_ASSET_BOUNTIES_API_PATH}/${bounty_index}`,
+      chain,
+    ),
+  );
+  const curator = bounty.onchainData?.curator ?? null;
+  const resolveIdentity = await createIdentityResolver({
+    chain,
+    addresses: [bounty.proposer, bounty.beneficiary, curator],
+  });
+  const balance = await getMultiAssetBountyBalance({
+    account: bounty.onchainData?.address,
+    bountyIndex: bounty.bountyIndex,
+    chain,
+  });
+
+  return {
+    index: bounty.bountyIndex,
+    ...pick(bounty, TREASURY_LIST_ITEM_FIELDS),
+    proposerIdentity: resolveIdentity(bounty.proposer),
+    beneficiaryIdentity: resolveIdentity(bounty.beneficiary),
+    curator,
+    curatorIdentity: resolveIdentity(curator),
+    assetKind: bounty.onchainData?.assetKind ?? null,
+    amount: balance
+      ? formatTreasuryAmount(bounty.onchainData?.value, balance.asset)
+      : null,
+    balance,
+    content: bounty.content ?? null,
+    url: createTreasuryItemUrl(
+      MULTI_ASSET_BOUNTIES_API_PATH,
+      bounty.bountyIndex,
+      chain,
+    ),
   };
 }
