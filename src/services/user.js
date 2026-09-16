@@ -24,7 +24,14 @@ const ARCHIVED_POLKADOT_PATHS = [
   "techcomm-proposals",
 ];
 
-function createUserResponse({ chain, address, detail, source, pagination, data }) {
+function createUserResponse({
+  chain,
+  address,
+  detail,
+  source,
+  pagination,
+  data,
+}) {
   return {
     chain,
     address,
@@ -86,7 +93,7 @@ async function requestUserJson({ chain, path, query = {} }) {
   }
 }
 
-function createUserListResponse({ chain, address, response, page, pageSize }) {
+function createUserListResponse({ chain, address, response }) {
   const payload = response.data;
 
   return createUserResponse({
@@ -95,11 +102,11 @@ function createUserListResponse({ chain, address, response, page, pageSize }) {
     detail: buildUserDetailUrl(chain, buildUserPath(address)),
     source: [response.endpoint],
     pagination: {
-      page: payload?.page ?? page,
-      pageSize: payload?.pageSize ?? payload?.page_size ?? pageSize,
-      total: payload?.total ?? payload?.count ?? 0,
+      page: payload?.page,
+      pageSize: payload?.pageSize,
+      total: payload?.total,
     },
-    data: payload?.items ?? payload?.data ?? payload,
+    data: payload?.items,
   });
 }
 
@@ -174,7 +181,7 @@ export async function listUserSubmissions({
     query: { page, page_size: pageSize },
   });
 
-  return createUserListResponse({ chain, address, response, page, pageSize });
+  return createUserListResponse({ chain, address, response });
 }
 
 export async function listUserVotes({
@@ -196,7 +203,7 @@ export async function listUserVotes({
     },
   });
 
-  return createUserListResponse({ chain, address, response, page, pageSize });
+  return createUserListResponse({ chain, address, response });
 }
 
 export async function listUserVoteCalls({
@@ -212,7 +219,7 @@ export async function listUserVoteCalls({
     query: { page, page_size: pageSize, includes_title: 1 },
   });
 
-  return createUserListResponse({ chain, address, response, page, pageSize });
+  return createUserListResponse({ chain, address, response });
 }
 
 export async function getUserVoteStats({ chain, address, modules }) {
