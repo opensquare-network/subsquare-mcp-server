@@ -73,9 +73,8 @@ async function listReferendumComments(
     referendumIndex,
     detailId: detail._id,
     total,
-    page: subsquareResponse?.page ?? page,
-    pageSize:
-      subsquareResponse?.pageSize ?? subsquareResponse?.page_size ?? pageSize,
+    page: subsquareResponse?.page,
+    pageSize: subsquareResponse?.pageSize,
     items,
   };
 }

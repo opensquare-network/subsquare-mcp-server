@@ -40,7 +40,7 @@ http://127.0.0.1:3210/mcp
 
 ## MCP Tools
 
-The server exposes **64 read-only tools** through the `/mcp` endpoint.
+The server exposes **71 read-only tools** through the `/mcp` endpoint.
 
 ### Posts
 
@@ -146,7 +146,19 @@ The server exposes **64 read-only tools** through the `/mcp` endpoint.
 | --- | --- | --- |
 | `account_list_extrinsics` | List compact account extrinsics with detail URLs and identity mappings. | Polkadot, Kusama, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
 | `account_list_transfers` | List account transfers with detail URLs and identity mappings. | Polkadot, Kusama, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
+| `account_list_assets` | List the pallet-assets tokens held by an address with raw and formatted balances and asset metadata. | Polkadot Asset Hub, Kusama Asset Hub |
+| `account_list_foreign_assets` | List the pallet-foreign-assets (XCM) tokens held by an address with asset location, raw and formatted balances, and metadata. | Polkadot Asset Hub, Kusama Asset Hub |
 | `block_get_detail` | Get a block by height or hash, or get the latest block. | Polkadot, Kusama, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
 | `block_list_events` | List events with module, method, block, and date filters. | Polkadot, Kusama, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
 | `block_list_extrinsics` | List extrinsics with module, method, block, and date filters. | Polkadot, Kusama, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
 | `identity_get_identities` | Batch-query address display names and identity verification status. | Polkadot, Kusama, Hydration, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
+
+### User Records
+
+| Tool | Description | Chains |
+| --- | --- | --- |
+| `get_user_overview` | Get a user profile, submission counts, and vote statistics. | Polkadot, Kusama |
+| `list_user_submissions` | List a user's submissions by category. | Polkadot, Kusama |
+| `list_user_votes` | List a user's votes in OpenGov, Democracy, or Fellowship. | Polkadot, Kusama |
+| `list_user_vote_calls` | List a user's vote calls by module. | Polkadot, Kusama |
+| `get_user_vote_stats` | Get vote statistics across selected modules. | Polkadot, Kusama |

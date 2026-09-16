@@ -17,3 +17,4 @@ export { registerSecretaryTools } from "./secretary/index.js";
 export { registerTechcommTools } from "./techcomm.js";
 export { registerTreasuryTools } from "./treasury/index.js";
 export { registerVestingTools } from "./vesting.js";
+export { registerUserTools } from "./user.js";
