@@ -1,5 +1,6 @@
 {
   "name": "subsquare-mcp-server",
+  "mcpName": "io.github.opensquare-network/subsquare-mcp-server",
   "version": "0.1.0",
   "description": "A Streamable HTTP MCP server for querying SubSquare Gov2 referenda through its API.",
   "type": "module",

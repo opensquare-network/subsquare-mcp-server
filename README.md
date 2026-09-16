@@ -14,16 +14,22 @@ npx --yes @modelcontextprotocol/inspector@latest
 
 ## Install
 
+All examples below connect to the local Streamable HTTP endpoint `http://127.0.0.1:3210/mcp`. For a deployed server, replace it with `https://<your-public-domain>/mcp`.
+
+This server does not require client authentication, so no API key, environment variable, or request header is needed.
+
+### Claude Code
+
+Install:
+
 ```bash
 claude mcp add --scope user --transport http subsquare-mcp http://127.0.0.1:3210/mcp
 ```
 
-## Reinstall
+Uninstall:
 
 ```bash
 claude mcp remove subsquare-mcp
-
-claude mcp add --scope user --transport http subsquare-mcp http://127.0.0.1:3210/mcp
 ```
 
 Available `--scope` values:
@@ -31,6 +37,20 @@ Available `--scope` values:
 - `local`: Local configuration (default)
 - `user`: Global configuration for the current user
 - `project`: Project configuration
+
+### Codex
+
+Install:
+
+```bash
+codex mcp add subsquare-mcp --url http://127.0.0.1:3210/mcp
+```
+
+Uninstall:
+
+```bash
+codex mcp remove subsquare-mcp
+```
 
 # Streamable HTTP
 
