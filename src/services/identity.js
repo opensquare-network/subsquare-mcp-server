@@ -1,7 +1,23 @@
 import { getSs58AddressInfo } from "polkadot-api";
+import { LRUCache } from "lru-cache";
+import isNil from "lodash/isNil.js";
 import pick from "lodash/pick.js";
 import { getIdentityConfig } from "../config/chains.js";
 import { request } from "./api.js";
+
+const IDENTITY_CACHE_TTL_MS = 5 * 60 * 1000;
+
+// Identities are read-only and stable within a few minutes, so cache them per
+// chain+address to keep repeated and overlapping lookups off the API. A cached
+// null records an address the registry has no identity for.
+const identityCache = new LRUCache({
+  max: 5_000,
+  ttl: IDENTITY_CACHE_TTL_MS,
+});
+
+function getIdentityCacheKey(chain, address) {
+  return `${chain}:${address}`;
+}
 
 function getUniqueAddresses(addresses) {
   return [
@@ -28,22 +44,51 @@ export async function getIdentityMap({ chain, addresses = [] } = {}) {
     return new Map();
   }
 
+  const identityMap = new Map();
+  const missingAddresses = [];
+  for (const address of uniqueAddresses) {
+    const cacheKey = getIdentityCacheKey(chain, address);
+    if (!identityCache.has(cacheKey)) {
+      missingAddresses.push(address);
+      continue;
+    }
+
+    const cachedIdentity = identityCache.get(cacheKey);
+    if (!isNil(cachedIdentity)) {
+      identityMap.set(address, cachedIdentity);
+    }
+  }
+
+  if (missingAddresses.length === 0) {
+    return identityMap;
+  }
+
   const identityConfig = getIdentityConfig(chain);
   const identities = await request.post(
-    new URL(
-      `${identityConfig.identityChain}/short-ids`,
-      identityConfig.apiUrl,
-    ),
+    new URL(`${identityConfig.identityChain}/short-ids`, identityConfig.apiUrl),
     {
-      addresses: uniqueAddresses,
+      addresses: missingAddresses,
     },
   );
 
   if (!Array.isArray(identities)) {
-    throw new Error("StateScan short identities response did not include identities");
+    throw new Error(
+      "StateScan short identities response did not include identities",
+    );
   }
 
-  return new Map(identities.map((identity) => [identity.address, identity]));
+  const fetchedIdentities = new Map(
+    identities.map((identity) => [identity.address, identity]),
+  );
+  for (const address of missingAddresses) {
+    const identity = fetchedIdentities.get(address) ?? null;
+    identityCache.set(getIdentityCacheKey(chain, address), identity);
+    if (!isNil(identity)) {
+      identityMap.set(address, identity);
+    }
+  }
+
+  return identityMap;
 }
 
 export async function createIdentityResolver({ chain, addresses } = {}) {

@@ -5,6 +5,15 @@ import { EnvHttpProxyAgent, fetch } from "undici";
 const API_REQUEST_TIMEOUT_MS = 10_000;
 const dispatcher = new EnvHttpProxyAgent();
 
+export class ApiRequestError extends Error {
+  constructor(message, { status = null, path = null } = {}) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.path = path;
+  }
+}
+
 function addQueryParams(url, query) {
   const requestUrl = new URL(url);
   requestUrl.search = new URLSearchParams(omitBy(query, isNil)).toString();
@@ -13,6 +22,7 @@ function addQueryParams(url, query) {
 }
 
 async function requestJson(url, { method = "GET", query = {}, body } = {}) {
+  const requestUrl = addQueryParams(url, query);
   const hasBody = body !== undefined;
   const headers = {
     accept: "application/json",
@@ -29,7 +39,7 @@ async function requestJson(url, { method = "GET", query = {}, body } = {}) {
     requestOptions.body = JSON.stringify(body);
   }
 
-  const response = await fetch(addQueryParams(url, query), requestOptions);
+  const response = await fetch(requestUrl, requestOptions);
 
   if (response.ok) {
     return response.json();
@@ -37,8 +47,12 @@ async function requestJson(url, { method = "GET", query = {}, body } = {}) {
 
   const message =
     (await response.text()).trim() || response.statusText || "Unknown error";
-  throw new Error(
+  throw new ApiRequestError(
     `API request failed with status ${response.status}: ${message}`,
+    {
+      status: response.status,
+      path: requestUrl.pathname,
+    },
   );
 }
 
