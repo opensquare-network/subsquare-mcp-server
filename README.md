@@ -40,7 +40,7 @@ http://127.0.0.1:3210/mcp
 
 ## MCP Tools
 
-The server exposes **60 read-only tools** through the `/mcp` endpoint.
+The server exposes **64 read-only tools** through the `/mcp` endpoint.
 
 ### Posts
 
@@ -104,9 +104,13 @@ The server exposes **60 read-only tools** through the `/mcp` endpoint.
 | `get_treasury_burn` | Get cumulative Treasury burns, paginated records, and optional history. | Polkadot, Kusama, Hydration |
 | `treasury_get_balances` | Get Treasury balances for one or all supported chains. | Polkadot, Kusama, Hydration, Acala, Karura, Bifrost, Astar |
 | `bounties_list_bounties` | List bounties with active and total counts. | Polkadot, Kusama |
-| `bounties_get_bounty` | Get a native-asset bounty's proposer, curator, value, live RPC balance, and content. | Polkadot, Kusama |
-| `bounties_get_bounty_statistics` | Get a native-asset bounty's payout statistics separately from its detail. | Polkadot, Kusama |
-| `bounties_get_multi_asset_bounty` | Get a multi-asset bounty and its current asset balance through PAPI. | Polkadot, Kusama |
+| `bounties_get_bounty` | Get a native-asset bounty by bounty index. | Polkadot, Kusama |
+| `bounties_get_bounty_statistics` | Get a native-asset bounty's payout statistics. | Polkadot, Kusama |
+| `bounties_get_multi_asset_bounty` | Get a Multi-Asset Bounty by ID. | Polkadot, Kusama |
+| `bounties_list_active_multi_asset_bounties` | List active Multi-Asset Bounties. | Polkadot, Kusama |
+| `bounties_list_inactive_multi_asset_bounties` | List inactive Multi-Asset Bounties. | Polkadot, Kusama |
+| `bounties_list_multi_asset_child_bounties` | List Multi-Asset Child Bounties. | Polkadot, Kusama |
+| `bounties_get_multi_asset_child_bounty` | Get a Multi-Asset Child Bounty by parent ID, child index, and optional disambiguating block height. | Polkadot, Kusama |
 
 ### Polkadot Fellowship
 

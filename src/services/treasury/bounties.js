@@ -1,4 +1,6 @@
+import isNil from "lodash/isNil.js";
 import pick from "lodash/pick.js";
+import upperFirst from "lodash/upperFirst.js";
 import { getAsset } from "../../config/assets.js";
 import { chains } from "../../config/chain.js";
 import { request } from "../api.js";
@@ -18,6 +20,8 @@ import {
 
 const BOUNTIES_API_PATH = "treasury/bounties";
 const MULTI_ASSET_BOUNTIES_API_PATH = "treasury/multi-asset-bounties";
+const MULTI_ASSET_CHILD_BOUNTIES_API_PATH =
+  "treasury/multi-asset-child-bounties";
 
 function getBountyAsset(chain) {
   return getAsset(chain, TREASURY_NATIVE_ASSET_SYMBOLS[chain]);
@@ -45,6 +49,41 @@ export function listBounties(query) {
     "bounties",
     createBountyListItem,
     query,
+  );
+}
+
+export function listActiveMultiAssetBounties({
+  chain = chains.polkadot,
+} = {}) {
+  return request.get(
+    createTreasuryUrl(`${MULTI_ASSET_BOUNTIES_API_PATH}/active`, chain),
+  );
+}
+
+export function listInactiveMultiAssetBounties({
+  chain = chains.polkadot,
+  ...query
+} = {}) {
+  return request.get(
+    createTreasuryUrl(`${MULTI_ASSET_BOUNTIES_API_PATH}/inactive`, chain),
+    { ...query, simple: true },
+  );
+}
+
+export function listMultiAssetChildBounties({
+  chain = chains.polkadot,
+  parentBountyId,
+  status,
+  ...query
+} = {}) {
+  return request.get(
+    createTreasuryUrl(MULTI_ASSET_CHILD_BOUNTIES_API_PATH, chain),
+    {
+      ...query,
+      parent: parentBountyId,
+      status: isNil(status) ? undefined : upperFirst(status),
+      simple: true,
+    },
   );
 }
 
@@ -95,11 +134,11 @@ export async function getBounty({
 
 export async function getMultiAssetBounty({
   chain = chains.polkadot,
-  bounty_index,
+  bountyId,
 } = {}) {
   const bounty = await request.get(
     createTreasuryUrl(
-      `${MULTI_ASSET_BOUNTIES_API_PATH}/${bounty_index}`,
+      `${MULTI_ASSET_BOUNTIES_API_PATH}/${encodeURIComponent(bountyId)}`,
       chain,
     ),
   );
@@ -115,6 +154,7 @@ export async function getMultiAssetBounty({
   });
 
   return {
+    ...bounty,
     index: bounty.bountyIndex,
     ...pick(bounty, TREASURY_LIST_ITEM_FIELDS),
     proposerIdentity: resolveIdentity(bounty.proposer),
@@ -133,4 +173,25 @@ export async function getMultiAssetBounty({
       chain,
     ),
   };
+}
+
+export async function getMultiAssetChildBounty({
+  chain = chains.polkadot,
+  parentBountyId,
+  childBountyIndex,
+  blockHeight,
+} = {}) {
+  const idParts = [parentBountyId, childBountyIndex];
+  if (!isNil(blockHeight)) {
+    idParts.push(blockHeight);
+  }
+  const id = idParts.join("_");
+  const childBounty = await request.get(
+    createTreasuryUrl(
+      `${MULTI_ASSET_CHILD_BOUNTIES_API_PATH}/${encodeURIComponent(id)}`,
+      chain,
+    ),
+  );
+
+  return childBounty;
 }

@@ -7,7 +7,11 @@ export {
   getBounty,
   getBountyStatistics,
   getMultiAssetBounty,
+  getMultiAssetChildBounty,
+  listActiveMultiAssetBounties,
   listBounties,
+  listInactiveMultiAssetBounties,
+  listMultiAssetChildBounties,
 } from "./bounties.js";
 export {
   getTreasuryProjectDetail,
