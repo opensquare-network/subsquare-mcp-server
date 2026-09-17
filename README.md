@@ -1,17 +1,19 @@
 # Subsquare MCP Server
 
-## Install
+Read-only MCP tools for querying Subsquare governance data. We recommend using the hosted server—no local server setup is required.
 
-All examples below connect to the local Streamable HTTP endpoint `http://127.0.0.1:3210/mcp`. For a deployed server, replace it with `https://<your-public-domain>/mcp`.
+**Hosted Streamable HTTP endpoint:** `https://mcp.subsquare.io/mcp`
 
-This server does not require client authentication, so no API key, environment variable, or request header is needed.
+## Quick start
+
+The hosted server does not require an API key or client authentication.
 
 ### Claude Code
 
 Install:
 
 ```bash
-claude mcp add --scope user --transport http subsquare-mcp http://127.0.0.1:3210/mcp
+claude mcp add --scope user --transport http subsquare-mcp https://mcp.subsquare.io/mcp
 ```
 
 Uninstall:
@@ -31,7 +33,7 @@ Available `--scope` values:
 Install:
 
 ```bash
-codex mcp add subsquare-mcp --url http://127.0.0.1:3210/mcp
+codex mcp add subsquare-mcp --url https://mcp.subsquare.io/mcp
 ```
 
 Uninstall:
@@ -40,24 +42,24 @@ Uninstall:
 codex mcp remove subsquare-mcp
 ```
 
-## Dev
-
-```
-pnpm start
-```
-
-Debug with the MCP inspector
-
-```
-npx --yes @modelcontextprotocol/inspector@latest
-```
-
-## Streamable HTTP
-
-```
-http://127.0.0.1:3210/mcp
-```
-
 ## MCP Tools
 
 The server exposes **71 read-only tools** through the `/mcp` endpoint. See the [tool catalog](TOOLS.md) for descriptions and supported chains.
+
+## Run locally (optional)
+
+For development or self-hosting, install dependencies and copy the example configuration:
+
+```bash
+pnpm install
+cp .env.example .env
+pnpm start
+```
+
+With `PORT=3210`, the local Streamable HTTP endpoint is `http://127.0.0.1:3210/mcp`. Use that URL instead of the hosted endpoint in the commands above to connect to your local server.
+
+Debug with the MCP Inspector:
+
+```bash
+npx --yes @modelcontextprotocol/inspector@latest
+```
