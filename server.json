@@ -1,0 +1,16 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.opensquare-network/subsquare-mcp-server",
+  "description": "A Streamable HTTP MCP server for querying SubSquare Gov2 referenda through its API.",
+  "repository": {
+    "url": "https://github.com/opensquare-network/subsquare-mcp-server",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.subsquare.io/mcp"
+    }
+  ]
+}
