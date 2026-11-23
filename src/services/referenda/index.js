@@ -1,6 +1,7 @@
 import { isCollectivesChain } from "../../config/chain.js";
 import { getChainConfig } from "../../config/chains.js";
 import { request } from "../api.js";
+import { resolvePreimage } from "../preimage.js";
 
 const OPENGOV_TRACK_PATHS = {
   summary: "gov2/tracks/summary",
@@ -30,9 +31,27 @@ export async function getReferendaSummary({ chain } = {}) {
   return request.get(summaryUrl);
 }
 
-export async function getReferendum({ chain, referendum_index } = {}) {
+export async function getReferendum({
+  chain,
+  referendum_index,
+  resolve_preimage: shouldResolvePreimage = false,
+} = {}) {
   const { apiUrl, referendaPath } = getChainConfig(chain);
-  return request.get(new URL(`${referendaPath}/${referendum_index}`, apiUrl));
+  const referendum = await request.get(
+    new URL(`${referendaPath}/${referendum_index}`, apiUrl),
+  );
+
+  if (!shouldResolvePreimage) {
+    return referendum;
+  }
+
+  const proposalHash = referendum?.onchainData?.proposalHash ?? null;
+  const preimage = await resolvePreimage({ chain, hash: proposalHash });
+
+  return {
+    ...referendum,
+    preimage,
+  };
 }
 
 export async function listReferendaTracks({ chain } = {}) {

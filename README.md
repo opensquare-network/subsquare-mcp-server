@@ -44,7 +44,7 @@ codex mcp remove subsquare-mcp
 
 ## MCP Tools
 
-The server exposes **71 read-only tools** through the `/mcp` endpoint. See the [tool catalog](TOOLS.md) for descriptions and supported chains.
+The server exposes **83 read-only tools** through the `/mcp` endpoint. See the [tool catalog](TOOLS.md) for descriptions and supported chains.
 
 ## Run locally (optional)
 

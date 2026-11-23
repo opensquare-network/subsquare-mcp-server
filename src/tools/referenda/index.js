@@ -15,6 +15,8 @@ import {
   simple,
 } from "../common.js";
 import { registerReferendaCommentTools } from "./comments.js";
+import { registerReferendaTrackTools } from "./tracks.js";
+import { registerReferendaVoteTools } from "./votes.js";
 
 const activeStates = [
   "Preparing",
@@ -67,6 +69,8 @@ const referendaListInputSchema = {
 
 export function registerReferendaTools(server) {
   registerReferendaCommentTools(server);
+  registerReferendaVoteTools(server);
+  registerReferendaTrackTools(server);
 
   server.registerTool(
     "opengov_list_tracks",
@@ -123,7 +127,7 @@ export function registerReferendaTools(server) {
     "opengov_referendum_detail",
     {
       description:
-        "Get the full details of one OpenGov referendum by its index.",
+        "Get the full details of one OpenGov referendum by its index. Set resolve_preimage to also decode the proposal hash preimage, which reveals nested batched calls.",
       inputSchema: {
         chain,
         referendum_index: z
@@ -131,6 +135,12 @@ export function registerReferendaTools(server) {
           .int()
           .nonnegative()
           .describe("The exact governance referendum index"),
+        resolve_preimage: z
+          .boolean()
+          .default(false)
+          .describe(
+            "Set to true to also return the decoded preimage for the referendum proposal hash (default false)",
+          ),
       },
       annotations: readOnlyAnnotations,
     },

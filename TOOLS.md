@@ -1,6 +1,15 @@
 # MCP Tools
 
-The server exposes **71 read-only tools** through the `/mcp` endpoint.
+The server exposes **83 read-only tools** through the `/mcp` endpoint.
+
+## Discovery and Overview
+
+| Tool | Description | Chains |
+| --- | --- | --- |
+| `gov_search` | Search governance modules by keyword: referenda, treasury proposals, spends, tips, bounties, child bounties, fellowship referenda, treasury projects, and Wiki articles. | Polkadot, Kusama, Polkadot Collectives, Hydration |
+| `gov_search_full_text` | Full-text search over posts and comments with highlighted snippets, plus projects and Wiki articles. | Polkadot |
+| `gov_overview` | Governance overview with active and total counts per module and per-track active referendum counts. | Polkadot, Kusama, Polkadot Collectives, Hydration |
+| `list_gov_events` | List governance events in a required time window, with optional summary-only mode and category, sub-category, and type filters. | Polkadot, Kusama, Polkadot Collectives, Hydration |
 
 ## Posts
 
@@ -29,8 +38,12 @@ The server exposes **71 read-only tools** through the `/mcp` endpoint.
 | --- | --- | --- |
 | `opengov_list_tracks` | List governance track IDs, names, active referendum counts, and detail URLs. Collectives returns Fellowship tracks. | Polkadot, Kusama, Polkadot Collectives, Hydration |
 | `opengov_list_referenda` | List and filter referenda. | Polkadot, Kusama, Hydration, Polkadot Collectives |
-| `opengov_referendum_detail` | Get a referendum's full details. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `opengov_referendum_detail` | Get a referendum's full details, with optional preimage resolution. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `opengov_referenda_summary` | Get referendum statistics. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `opengov_list_referendum_votes` | List a referendum's votes with vote-type and conviction summaries, turnout statistics, and optional tally history. | Polkadot, Kusama, Hydration |
+| `opengov_list_track_statistics` | List tracks with turnout ratios, referenda counts, and delegation statistics. | Polkadot, Kusama, Hydration |
+| `opengov_get_track_turnout` | Get a track's per-referendum turnout series with computed turnout and approval percentages. | Polkadot, Kusama, Hydration |
+| `opengov_list_track_delegatees` | List a track's delegatees with delegator counts and delegated capital and votes. | Polkadot, Kusama, Hydration |
 | `opengov_list_comments` | List OpenGov referendum comments, optionally merged with Polkassembly. | Polkadot, Kusama, Hydration |
 | `fellowship_list_comments` | List Fellowship referendum comments, optionally merged with Polkassembly. | Kusama, Polkadot Collectives |
 | `ambassador_list_comments` | List Ambassador referendum comments. | Polkadot Collectives |
@@ -71,6 +84,8 @@ The server exposes **71 read-only tools** through the `/mcp` endpoint.
 | `bounties_list_inactive_multi_asset_bounties` | List inactive Multi-Asset Bounties. | Polkadot, Kusama |
 | `bounties_list_multi_asset_child_bounties` | List Multi-Asset Child Bounties. | Polkadot, Kusama |
 | `bounties_get_multi_asset_child_bounty` | Get a Multi-Asset Child Bounty by parent ID, child index, and optional disambiguating block height. | Polkadot, Kusama |
+| `treasury_list_beneficiaries` | List treasury beneficiaries ranked by awarded USD value with per-module counts and tags. | Polkadot, Kusama |
+| `get_address_treasury_benefits` | Get the treasury funds an address received, with a per-module summary and paginated beneficiary records. | Polkadot, Kusama |
 
 ## Polkadot Fellowship
 
@@ -82,6 +97,7 @@ The server exposes **71 read-only tools** through the `/mcp` endpoint.
 | `fellowship_get_member_detail` | Get a member profile, evidence, salary, referendum and voting histories, and statistics. |
 | `fellowship_list_referenda_by_address` | List Fellowship referenda submitted by an address. |
 | `fellowship_list_votes_by_address` | List Fellowship votes cast by an address. |
+| `fellowship_list_referendum_votes` | List a Fellowship referendum's votes with vote-type summaries and optional tally history. |
 | `fellowship_treasury_get_balance` | Get Treasury DOT/HOLLAR and salary USDT/HOLLAR balances. |
 | `fellowship_treasury_get_status` | Get active and total Treasury spend counts. |
 | `fellowship_treasury_list_spends` | List Treasury spends with amounts, state, and detail URLs. |
@@ -112,6 +128,7 @@ The server exposes **71 read-only tools** through the `/mcp` endpoint.
 | `block_list_events` | List events with module, method, block, and date filters. | Polkadot, Kusama, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
 | `block_list_extrinsics` | List extrinsics with module, method, block, and date filters. | Polkadot, Kusama, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
 | `identity_get_identities` | Batch-query address display names and identity verification status. | Polkadot, Kusama, Hydration, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
+| `get_preimage` | Get a decoded preimage, including nested batched calls, by its 0x-prefixed hash. | Polkadot, Kusama, Polkadot Collectives, Hydration |
 
 ## User Records
 

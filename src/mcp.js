@@ -7,14 +7,19 @@ import {
   registerAddressVotesTools,
   registerBlockTools,
   registerBountiesTools,
+  registerBeneficiaryTools,
   registerCouncilTools,
   registerDelegationTools,
   registerCoretimeTools,
   registerDemocracyTools,
+  registerEventTools,
   registerFellowshipTools,
   registerIdentityTools,
+  registerOverviewTools,
   registerPostsTools,
+  registerPreimageTools,
   registerReferendaTools,
+  registerSearchTools,
   registerSecretaryTools,
   registerTechcommTools,
   registerUserTools,
@@ -32,6 +37,7 @@ const serverInstructions = [
   "When an address has an optional identity, show its identity display name when available; otherwise show the address.",
   "Preserve reported numbers, precision, units (including base or smallest units), and timestamp meaning. If you convert, format, or calculate a value, label it and keep the original when available.",
   "List tools are paginated; follow each tool's page description and defaults. When pagination metadata is present, report the returned page, page size, and total; suggest another page only when the metadata indicates that more records exist.",
+  "For broad discovery questions, start with gov_overview for current activity or gov_search for keyword lookup, then drill into module tools. Use gov_search_full_text for free-text phrases, and only on Polkadot.",
   "Respond in the user's language unless another language is requested.",
 ].join("\n");
 
@@ -50,14 +56,19 @@ export function createMcpServer() {
   registerAddressVotesTools(server);
   registerBlockTools(server);
   registerBountiesTools(server);
+  registerBeneficiaryTools(server);
   registerCouncilTools(server);
   registerDelegationTools(server);
   registerCoretimeTools(server);
   registerDemocracyTools(server);
+  registerEventTools(server);
   registerFellowshipTools(server);
   registerIdentityTools(server);
+  registerOverviewTools(server);
   registerPostsTools(server);
+  registerPreimageTools(server);
   registerReferendaTools(server);
+  registerSearchTools(server);
   registerSecretaryTools(server);
   registerTechcommTools(server);
   registerUserTools(server);
