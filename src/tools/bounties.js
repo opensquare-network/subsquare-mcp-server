@@ -12,10 +12,11 @@ import {
 } from "../services/treasury/index.js";
 import {
   createStructuredJsonResult,
-  page,
-  pageSize,
+  optionalPaginationInputShape,
+  paginatedItemsSchema,
   permissiveOutputSchema,
   readOnlyAnnotations,
+  rejectUnsupportedArguments,
 } from "./common.js";
 
 const bountyChain = z
@@ -33,29 +34,13 @@ const CHILD_STATUSES = [
   "paid",
 ];
 
-function rejectUnsupportedFilters(bountyType, provided) {
-  const names = Object.entries(provided)
-    .filter(([, value]) => value != null && value !== false)
-    .map(([name]) => name);
-
-  if (names.length === 0) {
-    return;
-  }
-
-  throw new Error(
-    `[unsupported_filter] ${names.join(", ")} ${
-      names.length === 1 ? "does" : "do"
-    } not apply to bounty_type=${bountyType}. Hint: use only the arguments documented for this bounty_type.`,
-  );
-}
-
 export function registerBountiesTools(server) {
   server.registerTool(
     "bounties_list",
     {
       description:
-        "List bounties on Polkadot or Kusama. bounty_type selects the record set: native (native-asset bounties), multi_asset (USDT/USDC-era bounties), or multi_asset_child (child bounties under a Multi-Asset Bounty). status applies to native (all only) and multi_asset (active or inactive, default active); use child_status for child bounties.",
-      inputSchema: {
+        "List bounties on Polkadot or Kusama. bounty_type selects native, multi_asset, or multi_asset_child records. For multi_asset, status defaults to active (unpaginated); use status=inactive for paginated records. Native supports status=all only; use child_status for child bounties.",
+      inputSchema: z.object({
         chain: bountyChain,
         bounty_type: z
           .enum(BOUNTY_TYPES)
@@ -76,10 +61,12 @@ export function registerBountiesTools(server) {
           .enum(CHILD_STATUSES)
           .optional()
           .describe("Only for multi_asset_child: filter by child bounty status"),
-        page,
-        page_size: pageSize,
-      },
-      outputSchema: permissiveOutputSchema,
+        ...optionalPaginationInputShape,
+      }).strict(),
+      outputSchema: paginatedItemsSchema
+        .partial()
+        .extend({ bounties: paginatedItemsSchema.shape.items.optional() })
+        .passthrough(),
       annotations: readOnlyAnnotations,
     },
     async ({
@@ -91,32 +78,37 @@ export function registerBountiesTools(server) {
       page: pageValue,
       page_size: pageSizeValue,
     }) => {
+      const pagination = { page: pageValue ?? 1, page_size: pageSizeValue ?? 25 };
       if (bountyType === "native") {
         if (status != null && status !== "all") {
           throw new Error(
             `[unsupported_filter] native bounties do not support status=${status}. Hint: omit status or use status=all for native bounties.`,
           );
         }
-        rejectUnsupportedFilters("native", {
+        rejectUnsupportedArguments("bounty_type=native", {
           parent_bounty_id: parentBountyId,
           child_status: childStatus,
         });
         return createStructuredJsonResult(
           await listBounties({
             chain,
-            page: pageValue,
-            page_size: pageSizeValue,
+            ...pagination,
           }),
         );
       }
 
       if (bountyType === "multi_asset") {
-        rejectUnsupportedFilters("multi_asset", {
+        rejectUnsupportedArguments("bounty_type=multi_asset", {
           parent_bounty_id: parentBountyId,
           child_status: childStatus,
         });
 
         if (status == null || status === "active") {
+          rejectUnsupportedArguments(
+            "bounty_type=multi_asset with status=active",
+            { page: pageValue, page_size: pageSizeValue },
+            "Omit pagination for active bounties; only the inactive list is paginated.",
+          );
           return createStructuredJsonResult({
             bounties: await listActiveMultiAssetBounties({ chain }),
           });
@@ -125,8 +117,7 @@ export function registerBountiesTools(server) {
           return createStructuredJsonResult(
             await listInactiveMultiAssetBounties({
               chain,
-              page: pageValue,
-              page_size: pageSizeValue,
+              ...pagination,
             }),
           );
         }
@@ -147,8 +138,7 @@ export function registerBountiesTools(server) {
           chain,
           parentBountyId,
           status: childStatus,
-          page: pageValue,
-          page_size: pageSizeValue,
+          ...pagination,
         }),
       );
     },
@@ -159,7 +149,7 @@ export function registerBountiesTools(server) {
     {
       description:
         "Get one bounty. bounty_type selects the record: native (requires bounty_index; optional include_statistics, which returns statistics: null when the API has none), multi_asset (requires bounty_id), or multi_asset_child (requires parent_bounty_id and child_bounty_index, optional block_height).",
-      inputSchema: {
+      inputSchema: z.object({
         chain: bountyChain,
         bounty_type: z
           .enum(BOUNTY_TYPES)
@@ -198,11 +188,11 @@ export function registerBountiesTools(server) {
           ),
         include_statistics: z
           .boolean()
-          .default(false)
+          .optional()
           .describe(
             "Only for bounty_type=native: also return payout statistics (default false)",
           ),
-      },
+      }).strict(),
       outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
@@ -217,7 +207,7 @@ export function registerBountiesTools(server) {
       include_statistics: includeStatistics,
     }) => {
       if (bountyType === "native") {
-        rejectUnsupportedFilters("native", {
+        rejectUnsupportedArguments("bounty_type=native", {
           bounty_id: bountyId,
           parent_bounty_id: parentBountyId,
           child_bounty_index: childBountyIndex,
@@ -247,12 +237,12 @@ export function registerBountiesTools(server) {
       }
 
       if (bountyType === "multi_asset") {
-        rejectUnsupportedFilters("multi_asset", {
+        rejectUnsupportedArguments("bounty_type=multi_asset", {
           bounty_index: bountyIndex,
           parent_bounty_id: parentBountyId,
           child_bounty_index: childBountyIndex,
           block_height: blockHeight,
-          include_statistics: includeStatistics || null,
+          include_statistics: includeStatistics,
         });
         if (bountyId == null) {
           throw new Error(
@@ -264,10 +254,10 @@ export function registerBountiesTools(server) {
         );
       }
 
-      rejectUnsupportedFilters("multi_asset_child", {
+      rejectUnsupportedArguments("bounty_type=multi_asset_child", {
         bounty_index: bountyIndex,
         bounty_id: bountyId,
-        include_statistics: includeStatistics || null,
+        include_statistics: includeStatistics,
       });
       if (parentBountyId == null || childBountyIndex == null) {
         throw new Error(

@@ -11,15 +11,19 @@ import {
   listTreasuryProposals,
   listTreasurySpends,
   listTreasuryTips,
+  summarizeTreasuryProject,
 } from "../../services/treasury/index.js";
 import {
   createStructuredJsonResult,
-  page,
-  pageSize,
-  permissiveOutputSchema,
+  optionalPaginationInputShape,
+  paginatedItemsSchema,
   readOnlyAnnotations,
+  rejectUnsupportedArguments,
 } from "../common.js";
-import { registerTreasuryProjectTools } from "./projects.js";
+import {
+  registerTreasuryProjectTools,
+  treasuryProjectSummarySchema,
+} from "./projects.js";
 
 const treasuryChain = z
   .enum(treasuryChains)
@@ -33,16 +37,20 @@ export function registerTreasuryTools(server) {
     "treasury_list",
     {
       description:
-        "List Treasury records on a chain. kind selects the record set: projects (Polkadot projects with linked funding records), tips, proposals, or spends. Items are compact and include state, proposer, beneficiary, identity, amount, and detail URL.",
-      inputSchema: {
-        chain: treasuryChain,
-        kind: z
-          .enum(TREASURY_LIST_KINDS)
-          .describe("Record set to list: projects, tips, proposals, or spends"),
-        page,
-        page_size: pageSize,
-      },
-      outputSchema: permissiveOutputSchema,
+        "List Treasury records on a chain. kind=projects lists compact Polkadot project metadata without pagination; use treasury_get_project_detail for linked funding records. Tips, proposals, and spends are paginated and include compact records with detail URLs.",
+      inputSchema: z
+        .object({
+          chain: treasuryChain,
+          kind: z
+            .enum(TREASURY_LIST_KINDS)
+            .describe("Record set to list: projects, tips, proposals, or spends"),
+          ...optionalPaginationInputShape,
+        })
+        .strict(),
+      outputSchema: paginatedItemsSchema
+        .partial()
+        .extend({ projects: z.array(treasuryProjectSummarySchema).optional() })
+        .passthrough(),
       annotations: readOnlyAnnotations,
     },
     async ({ chain, kind, page: pageValue, page_size: pageSizeValue }) => {
@@ -52,8 +60,13 @@ export function registerTreasuryTools(server) {
             `[unsupported_chain] Treasury projects are only available on polkadot. Hint: use kind=tips, proposals, or spends for ${chain}.`,
           );
         }
+        rejectUnsupportedArguments(
+          "kind=projects",
+          { page: pageValue, page_size: pageSizeValue },
+          "Omit page and page_size; the result contains all projects.",
+        );
         return createStructuredJsonResult({
-          projects: await listTreasuryProjects(),
+          projects: (await listTreasuryProjects()).map(summarizeTreasuryProject),
         });
       }
 
@@ -66,8 +79,8 @@ export function registerTreasuryTools(server) {
       return createStructuredJsonResult(
         await handlers[kind]({
           chain,
-          page: pageValue,
-          page_size: pageSizeValue,
+          page: pageValue ?? 1,
+          page_size: pageSizeValue ?? 25,
         }),
       );
     },
@@ -77,22 +90,32 @@ export function registerTreasuryTools(server) {
     "treasury_get",
     {
       description:
-        "Get Treasury-level data on a chain. view=status returns active and total counts for tips, proposals, and spends; view=burn returns cumulative Treasury burns with paginated records and optional history.",
-      inputSchema: {
-        chain: treasuryChain,
-        view: z
-          .enum(TREASURY_GET_VIEWS)
-          .describe("View to return: status or burn"),
-        page,
-        page_size: pageSize,
-        include_history: z
-          .boolean()
-          .default(false)
-          .describe(
-            "Only for view=burn: include burn history, newest first (default false)",
-          ),
-      },
-      outputSchema: permissiveOutputSchema,
+        "Get Treasury-level data on a chain. view=status returns active and total counts for proposals, spends, and bounties; view=burn returns cumulative Treasury burns with paginated records and optional history. Pass pagination only for view=burn.",
+      inputSchema: z
+        .object({
+          chain: treasuryChain,
+          view: z
+            .enum(TREASURY_GET_VIEWS)
+            .describe("View to return: status or burn"),
+          ...optionalPaginationInputShape,
+          include_history: z
+            .boolean()
+            .optional()
+            .describe(
+              "Only for view=burn: include burn history, newest first (default false)",
+            ),
+        })
+        .strict(),
+      outputSchema: paginatedItemsSchema
+        .partial()
+        .extend({
+          totalBurnt: z
+            .string()
+            .optional()
+            .describe("Cumulative burns in smallest units; only for view=burn"),
+          history: paginatedItemsSchema.shape.items.optional(),
+        })
+        .passthrough(),
       annotations: readOnlyAnnotations,
     },
     async ({
@@ -101,17 +124,25 @@ export function registerTreasuryTools(server) {
       page: pageValue,
       page_size: pageSizeValue,
       include_history: includeHistory,
-    }) =>
-      createStructuredJsonResult(
-        view === "status"
-          ? await getTreasuryStatus({ chain })
-          : await getTreasuryBurn({
-              chain,
-              page: pageValue,
-              pageSize: pageSizeValue,
-              includeHistory,
-            }),
-      ),
+    }) => {
+      if (view === "status") {
+        rejectUnsupportedArguments(
+          "view=status",
+          { page: pageValue, page_size: pageSizeValue, include_history: includeHistory },
+          "Use these arguments only for view=burn.",
+        );
+        return createStructuredJsonResult(await getTreasuryStatus({ chain }));
+      }
+
+      return createStructuredJsonResult(
+        await getTreasuryBurn({
+          chain,
+          page: pageValue ?? 1,
+          pageSize: pageSizeValue ?? 25,
+          includeHistory: includeHistory ?? false,
+        }),
+      );
+    },
   );
 
   server.registerTool(
@@ -127,7 +158,21 @@ export function registerTreasuryTools(server) {
             "Optional DotTreasury chain. Omit to return every reported chain.",
           ),
       },
-      outputSchema: permissiveOutputSchema,
+      outputSchema: {
+        treasuries: z.array(
+          z.object({
+            chain: z.string(),
+            balance: z.string().describe("Chain-level balance as reported by DotTreasury"),
+            balances: z.array(
+              z.object({
+                token: z.string(),
+                balance: z.string().describe("Raw balance in the asset's smallest units"),
+                decimals: z.number().int().nonnegative(),
+              }).passthrough(),
+            ).nullable(),
+          }).passthrough(),
+        ),
+      },
       annotations: readOnlyAnnotations,
     },
     async ({ chain }) => {

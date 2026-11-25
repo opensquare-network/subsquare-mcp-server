@@ -13,8 +13,10 @@ import {
   createStructuredJsonResult,
   page,
   pageSize,
+  paginatedItemsSchema,
   permissiveOutputSchema,
   readOnlyAnnotations,
+  rejectUnsupportedArguments,
 } from "./common.js";
 
 const userChains = z
@@ -33,6 +35,12 @@ const userPageSize = (defaultValue) =>
   pageSize
     .default(defaultValue)
     .describe(`Items per page, maximum 100 (default ${defaultValue})`);
+const userListOutputSchema = z
+  .object({
+    pagination: paginatedItemsSchema.omit({ items: true }).nullable(),
+    data: paginatedItemsSchema.shape.items.nullable(),
+  })
+  .passthrough();
 
 function createUserErrorResult({ chain, address, error }) {
   return createStructuredJsonResult({
@@ -92,7 +100,7 @@ export function registerUserTools(server) {
           page_size: userPageSize(20),
         })
         .strict(),
-      outputSchema: permissiveOutputSchema,
+      outputSchema: userListOutputSchema,
       annotations: readOnlyAnnotations,
     },
     async ({ chain, address, category, page, page_size: pageSize }) =>
@@ -105,10 +113,13 @@ export function registerUserTools(server) {
     "list_user_voting",
     {
       description:
-        "List a Subsquare user's votes or vote calls in one voting module, with pagination. kind=votes optionally filters by vote type.",
+        "List a Subsquare user's votes or vote calls in one voting module, with pagination. kind=votes optionally filters by vote type. Hydration supports only OpenGov votes (kind=votes, module=referenda).",
       inputSchema: z
         .object({
-          chain: userChains,
+          chain: z
+            .enum([chains.polkadot, chains.kusama, chains.hydration])
+            .default(chains.polkadot)
+            .describe("Hydration is only available for kind=votes with module=referenda"),
           address: userAddress,
           kind: z
             .enum(["votes", "vote_calls"])
@@ -116,22 +127,32 @@ export function registerUserTools(server) {
           module: z.enum(["referenda", "democracy", "fellowship"]),
           type: z
             .enum(["all", "aye", "nay", "split", "abstain"])
-            .default("all")
+            .optional()
             .describe(
-              "Vote type filter for kind=votes; all omits the backend type parameter",
+              "Only for kind=votes: vote type filter (default all, no filter)",
             ),
           page,
           page_size: userPageSize(25),
         })
         .strict(),
-      outputSchema: permissiveOutputSchema,
+      outputSchema: userListOutputSchema,
       annotations: readOnlyAnnotations,
     },
-    async ({ chain, address, kind, module, type, page, page_size: pageSize }) =>
-      withUserErrorResult({ chain, address }, () =>
+    async ({ chain, address, kind, module, type, page, page_size: pageSize }) => {
+      if (chain === chains.hydration && (kind !== "votes" || module !== "referenda")) {
+        throw new Error(
+          "[unsupported_chain] Hydration only supports OpenGov votes. Hint: set kind=votes and module=referenda, or use polkadot or kusama.",
+        );
+      }
+      if (kind === "vote_calls") {
+        rejectUnsupportedArguments("kind=vote_calls", { type }, "Omit type or use kind=votes.");
+      }
+
+      return withUserErrorResult({ chain, address }, () =>
         kind === "votes"
-          ? listUserVotes({ chain, address, module, type, page, pageSize })
+          ? listUserVotes({ chain, address, module, type: type ?? "all", page, pageSize })
           : listUserVoteCalls({ chain, address, module, page, pageSize }),
-      ),
+      );
+    },
   );
 }

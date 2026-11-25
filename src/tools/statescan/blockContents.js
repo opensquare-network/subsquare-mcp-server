@@ -5,8 +5,8 @@ import {
 } from "../../services/statescan/blockContents.js";
 import {
   createStructuredJsonResult,
-  permissiveOutputSchema,
   readOnlyAnnotations,
+  zeroBasedPaginatedItemsSchema,
 } from "../common.js";
 import { chain } from "./block.js";
 
@@ -62,7 +62,9 @@ export function registerBlockContentsTools(server) {
         ...paginationInputShape,
         ...filterInputShape,
       },
-      outputSchema: permissiveOutputSchema,
+      outputSchema: zeroBasedPaginatedItemsSchema
+        .partial({ page: true, pageSize: true, total: true })
+        .passthrough(),
       annotations: readOnlyAnnotations,
     },
     async ({ kind, ...args }) =>

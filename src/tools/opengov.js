@@ -6,13 +6,17 @@ import {
   listTracks,
 } from "../services/opengov/index.js";
 import {
-  chain,
   createStructuredJsonResult,
+  paginatedItemsSchema,
   paginationInputShape,
   permissiveOutputSchema,
   readOnlyAnnotations,
   simple,
 } from "./common.js";
+
+const chain = z
+  .enum(subsquareApiChains)
+  .describe("Governance chain: polkadot, kusama, collectives, or hydration");
 
 const activeStates = [
   "Preparing",
@@ -68,6 +72,10 @@ const referendaListInputSchema = {
     .describe(
       "Only referenda proposed by this address or username. Routes to the user-scoped endpoint, so it cannot be combined with referendum_index, status, ongoing, is_treasury, includes_timeline, or sort; not available on collectives",
     ),
+  include_summary: z
+    .boolean()
+    .default(false)
+    .describe("Include chain-wide state counts independent of filters (default false)"),
   simple,
 };
 
@@ -76,9 +84,14 @@ export function registerOpengovTools(server) {
     "opengov_list_referenda",
     {
       description:
-        "List and filter OpenGov referenda (on-chain governance proposals) on a configured chain, or list one proposer's referenda with `proposer`. The response also includes chain-wide state counts as `summary`, merged from the former separate summary tool.",
-      inputSchema: referendaListInputSchema,
-      outputSchema: permissiveOutputSchema,
+        "List and filter OpenGov referenda, or list one proposer's referenda with proposer. Set include_summary to also get chain-wide state counts; summaryStatus distinguishes available, not_requested, and unavailable.",
+      inputSchema: z.object(referendaListInputSchema).strict(),
+      outputSchema: paginatedItemsSchema
+        .extend({
+          summary: z.unknown().describe("Chain-wide state counts, or null"),
+          summaryStatus: z.enum(["available", "not_requested", "unavailable"]),
+        })
+        .passthrough(),
       annotations: readOnlyAnnotations,
     },
     async (args) => createStructuredJsonResult(await listReferenda(args)),
@@ -108,13 +121,7 @@ export function registerOpengovTools(server) {
     {
       description:
         "List governance track IDs, names, active referendum counts, and SubSquare detail URLs. On collectives, returns Fellowship tracks.",
-      inputSchema: {
-        chain: z
-          .enum(subsquareApiChains)
-          .describe(
-            "Governance chain to query: polkadot, kusama, collectives, or hydration",
-          ),
-      },
+      inputSchema: { chain },
       outputSchema: {
         tracks: z.array(
           z.object({
@@ -139,5 +146,4 @@ export function registerOpengovTools(server) {
     },
     async (args) => createStructuredJsonResult(await listTracks(args)),
   );
-
 }

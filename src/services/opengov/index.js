@@ -1,11 +1,37 @@
+import { LRUCache } from "lru-cache";
 import { isCollectivesChain } from "../../config/chain.js";
-import { getChainConfig } from "../../config/chains.js";
+import { getChainConfig, subsquareApiChains } from "../../config/chains.js";
 import { request } from "../api.js";
 import {
   FELLOWSHIP_TRACK_PATHS,
   OPENGOV_TRACK_PATHS,
   getReferendaEndpoints,
 } from "./paths.js";
+
+const referendaSummaries = new LRUCache({
+  max: subsquareApiChains.length,
+  ttl: 60_000,
+  fetchMethod: async (chain) => {
+    const { summaryUrl } = getReferendaEndpoints(chain);
+    const summary = await request.get(summaryUrl);
+    if (summary == null) {
+      throw new Error("SubSquare referenda summary response was empty");
+    }
+    return summary;
+  },
+});
+
+async function loadReferendaSummary(chain) {
+  try {
+    return {
+      summary: await referendaSummaries.fetch(chain),
+      summaryStatus: "available",
+    };
+  } catch (error) {
+    console.warn(`Unable to query ${chain} referenda summary:`, error.message);
+    return { summary: null, summaryStatus: "unavailable" };
+  }
+}
 
 // The user-scoped referenda route only supports pagination and the simple
 // projection; other filters belong to the collection route.
@@ -32,34 +58,38 @@ function assertProposerFilterSupport(query) {
 }
 
 /**
- * Lists referenda and folds the former standalone summary tool into the same
- * response (`summary`). `proposer` folds the former by-address tool into the
- * same tool, routing to the user-scoped endpoint.
+ * Lists referenda, with optional chain-wide summary counts.
+ * A proposer uses the user-scoped endpoint.
  */
-export async function listReferenda({ chain, proposer, ...query } = {}) {
-  const { listUrl, summaryUrl, proposerListUrl } =
-    getReferendaEndpoints(chain);
+export async function listReferenda({
+  chain,
+  proposer,
+  include_summary: includeSummary = false,
+  ...query
+} = {}) {
+  const { listUrl, proposerListUrl } = getReferendaEndpoints(chain);
 
   if (proposer != null) {
     if (isCollectivesChain(chain)) {
       throw new Error(
-        `[unsupported_chain] proposer lookup is not available on ${chain}. Hint: use list_user_submissions(category=fellowship_referenda) on collectives.`,
+        `[unsupported_chain] proposer lookup is not available on ${chain}. Hint: call fellowship_list_address_activity with kind=referenda and pass the proposer's SS58 address as address.`,
       );
     }
 
     assertProposerFilterSupport(query);
   }
 
-  const requestUrl =
-    proposer == null ? listUrl : proposerListUrl(proposer);
-  const [response, summary] = await Promise.all([
+  const requestUrl = proposer == null ? listUrl : proposerListUrl(proposer);
+  const [response, summaryResult] = await Promise.all([
     request.get(requestUrl, query),
-    request.get(summaryUrl).catch(() => null),
+    includeSummary
+      ? loadReferendaSummary(chain)
+      : { summary: null, summaryStatus: "not_requested" },
   ]);
 
   return {
     ...response,
-    summary,
+    ...summaryResult,
   };
 }
 

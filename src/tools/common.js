@@ -21,11 +21,30 @@ export const paginationInputShape = {
   page_size: pageSize,
 };
 
+// Mixed tools validate the selected mode before applying pagination defaults.
+export const optionalPaginationInputShape = {
+  page: page.removeDefault().optional().describe(page.description),
+  page_size: pageSize.removeDefault().optional().describe(pageSize.description),
+};
+
+export function rejectUnsupportedArguments(mode, args, hint = "Remove these arguments.") {
+  const names = Object.keys(args).filter((name) => args[name] !== undefined);
+  if (names.length) {
+    throw new Error(
+      `[unsupported_filter] ${names.join(", ")} not valid for ${mode}. Hint: ${hint}`,
+    );
+  }
+}
+
 export const paginatedItemsSchema = z.object({
   items: z.array(z.object({}).passthrough()),
   page: z.number().int().positive(),
   pageSize: z.number().int().positive(),
   total: z.number().int().nonnegative(),
+});
+
+export const zeroBasedPaginatedItemsSchema = paginatedItemsSchema.extend({
+  page: z.number().int().nonnegative(),
 });
 
 // Structured content is still returned; the schema stays permissive for deep or

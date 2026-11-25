@@ -14,6 +14,7 @@
     "papi:update": "pnpm exec papi update",
     "postinstall": "papi",
     "start": "node src/index.js",
+    "test": "node --test",
     "no-proxy-start": "HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= http_proxy= https_proxy= all_proxy= NO_PROXY=* no_proxy=* node src/index.js"
   },
   "dependencies": {

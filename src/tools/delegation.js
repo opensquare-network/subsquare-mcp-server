@@ -8,8 +8,9 @@ import {
 import {
   accountAddress,
   createStructuredJsonResult,
-  permissiveOutputSchema,
+  paginatedItemsSchema,
   readOnlyAnnotations,
+  rejectUnsupportedArguments,
 } from "./common.js";
 
 const opengovChain = z
@@ -36,7 +37,7 @@ export function registerDelegationTools(server) {
     {
       description:
         "List OpenGov delegation data on a chain. view selects the record set: delegates (delegates with statistics and available profiles), delegators (one delegate's delegators; requires address, optional track_id), or track (delegation relationships for one required track_id).",
-      inputSchema: {
+      inputSchema: z.object({
         chain: opengovChain,
         view: z
           .enum(["delegates", "delegators", "track"])
@@ -54,8 +55,8 @@ export function registerDelegationTools(server) {
           ),
         page,
         page_size: pageSize,
-      },
-      outputSchema: permissiveOutputSchema,
+      }).strict(),
+      outputSchema: paginatedItemsSchema.passthrough(),
       annotations: readOnlyAnnotations,
     },
     async ({ view, chain, address, track_id: trackId, page, page_size: pageSizeValue }) => {
@@ -77,6 +78,11 @@ export function registerDelegationTools(server) {
       }
 
       if (view === "track") {
+        rejectUnsupportedArguments(
+          "view=track",
+          { address },
+          "Use view=delegators for an address lookup.",
+        );
         if (trackId == null) {
           throw new Error(
             "[missing_track_id] view=track requires track_id. Hint: call opengov_list_tracks to find track IDs.",
@@ -92,6 +98,11 @@ export function registerDelegationTools(server) {
         );
       }
 
+      rejectUnsupportedArguments(
+        "view=delegates",
+        { address, track_id: trackId },
+        "Use view=delegators for an address or view=track for a track.",
+      );
       return createStructuredJsonResult(
         await listDelegates({ chain, page, page_size: pageSizeValue }),
       );

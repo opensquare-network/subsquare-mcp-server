@@ -6,9 +6,9 @@ selects the specific record set with an enum argument (`kind`, `view`, `bounty_t
 
 Conventions:
 
-- All tools are read-only and paginated unless stated otherwise; pass `page` / `page_size`
-  (or `limit` / `offset` where the upstream API requires it). `account_list` and `block_list`
-  use a zero-based `page`; every other paginated tool starts at page 1.
+- All tools are read-only. Most paginated lists take `page` / `page_size` starting at page 1.
+  `block_list` and account extrinsics/transfers start at page 0. Account assets and Coretime
+  list queries take `limit` / `offset`; Vesting accounts take `limit` / `cursor`.
 - `chain` accepts only the chains listed for the tool; unsupported combinations fail fast
   with an actionable error.
 - Arguments that do not apply to the selected record type are rejected with an actionable
@@ -19,7 +19,7 @@ Conventions:
 
 | Tool | Enum | Description | Chains |
 | --- | --- | --- | --- |
-| `opengov_list_referenda` | — | List and filter referenda, or list one proposer's referenda with `proposer`. The response also carries chain-wide state counts as `summary`. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `opengov_list_referenda` | — | List and filter referenda, or use `proposer` to list one user's referenda (not on Collectives). Set `include_summary: true` for chain-wide state counts, cached for one minute. `summaryStatus` is `available`, `not_requested`, or `unavailable`. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `opengov_referendum_detail` | — | Get one referendum's full details. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `opengov_list_tracks` | — | List track IDs, names, active referendum counts, and detail URLs. Collectives returns Fellowship tracks. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `list_referendum_comments` | `referendum_type` = `opengov` \| `fellowship` \| `ambassador` | List referendum comments, optionally merged with Polkassembly comments, with reactions and nested replies. | OpenGov: Polkadot, Kusama, Hydration. Fellowship: Polkadot Collectives, Kusama. Ambassador: Polkadot Collectives |
@@ -37,18 +37,18 @@ Conventions:
 
 | Tool | Enum | Description | Chains |
 | --- | --- | --- | --- |
-| `treasury_list` | `kind` = `projects` \| `tips` \| `proposals` \| `spends` | List Treasury projects, tips, proposals, or spends with state, amounts, identities, and detail URLs. | Projects: Polkadot. Tips, proposals, spends: Polkadot, Kusama, Hydration |
-| `treasury_get` | `view` = `status` \| `burn` | Summarize Treasury activity counts, or get cumulative burns with paginated records and optional history. | Polkadot, Kusama, Hydration |
+| `treasury_list` | `kind` = `projects` \| `tips` \| `proposals` \| `spends` | Return compact project metadata (unpaginated) or paginated tips, proposals, or spends. Use `treasury_get_project_detail` for a project's linked funding records. | Projects: Polkadot. Tips, proposals, spends: Polkadot, Kusama, Hydration |
+| `treasury_get` | `view` = `status` \| `burn` | Summarize Treasury activity counts, or get cumulative burns with paginated records and optional history. Pagination and `include_history` apply only to `view=burn`. | Polkadot, Kusama, Hydration |
 | `treasury_get_balances` | — | Get Treasury balances reported by DotTreasury for one chain or every reported chain. | Polkadot, Kusama, Hydration, Acala, Karura, Bifrost, Astar |
 | `treasury_get_project_detail` | — | Get one Polkadot Treasury project with its linked proposals, spends, tips, bounties, and child bounties. | Polkadot |
-| `bounties_list` | `bounty_type` = `native` \| `multi_asset` \| `multi_asset_child` | List native bounties, Multi-Asset Bounties (`status` = `active`, the default when omitted, or `inactive`), or child bounties of a Multi-Asset Bounty (`child_status`). | Polkadot, Kusama |
+| `bounties_list` | `bounty_type` = `native` \| `multi_asset` \| `multi_asset_child` | List native bounties, Multi-Asset Bounties (`status=active` by default, unpaginated; `status=inactive` is paginated), or child bounties of a Multi-Asset Bounty (`child_status`). | Polkadot, Kusama |
 | `bounties_get` | `bounty_type` = `native` \| `multi_asset` \| `multi_asset_child` | Get one native bounty (optional `include_statistics`; `statistics` is null when the API has none), one Multi-Asset Bounty, or one child bounty. | Polkadot, Kusama |
 
 ## Polkadot Fellowship
 
 | Tool | Enum | Description |
 | --- | --- | --- |
-| `fellowship_list` | `kind` = `feeds` \| `applications` \| `members` | Browse the activity feed, membership applications, or the current member roster. |
+| `fellowship_list` | `kind` = `feeds` \| `applications` \| `members` | Browse the activity feed or membership applications with pagination, or get the full member roster without pagination. |
 | `fellowship_get_member_detail` | — | Get a member profile with evidence, salary claims, submitted referenda, votes, and salary/rank statistics. |
 | `fellowship_list_address_activity` | `kind` = `referenda` \| `votes` | List Fellowship referenda submitted by an address, or its votes (`type` = `aye` \| `nay`). |
 | `fellowship_salary` | `kind` = `overview` \| `by_rank` \| `rank_changes` \| `member` \| `claimants` | Salary spending by cycle or by rank, rank-change counts, one address's salary statistics (`address`), or all claimants. |
@@ -79,7 +79,7 @@ Conventions:
 | --- | --- | --- | --- |
 | `get_user_overview` | — | Get a user profile, submission counts, and selected module vote statistics. | Polkadot, Kusama |
 | `list_user_submissions` | — | List a user's submissions for one mapped category. | Polkadot, Kusama |
-| `list_user_voting` | `kind` = `votes` \| `vote_calls` | List a user's votes (optionally filtered by vote type) or vote calls in one voting module. | Polkadot, Kusama |
+| `list_user_voting` | `kind` = `votes` \| `vote_calls` | List a user's votes or vote calls in one voting module. `type` applies only to `kind=votes`. | Polkadot, Kusama; Hydration only for `kind=votes, module=referenda` |
 
 ## Vesting and Coretime
 

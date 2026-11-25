@@ -44,7 +44,9 @@ codex mcp remove subsquare-mcp
 
 ## MCP Tools
 
-The server exposes **35 read-only tools** through the `/mcp` endpoint. Related endpoints are grouped behind one tool and selected with a `kind`, `view`, or `bounty_type` argument, which keeps the tool list small while preserving every record set. See the [tool catalog](TOOLS.md) for descriptions, enum values, and supported chains.
+The server exposes **35 read-only tools** through the `/mcp` endpoint. Related endpoints are grouped behind one tool and selected with a `kind`, `view`, or `bounty_type` argument. See the [tool catalog](TOOLS.md) for descriptions, enum values, and supported chains.
+
+Version 0.2 changes tool names and arguments without retaining the old names. Clients should use the current `tools/list` response; reconnect if a client still shows the old catalog. Saved tool calls may need to be updated.
 
 ## Run locally (optional)
 

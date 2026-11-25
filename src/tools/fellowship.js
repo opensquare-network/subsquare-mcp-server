@@ -9,8 +9,11 @@ import {
   accountAddress,
   createStructuredJsonResult,
   includesTitle,
+  optionalPaginationInputShape,
+  paginatedItemsSchema,
   paginationInputShape,
   readOnlyAnnotations,
+  rejectUnsupportedArguments,
   permissiveOutputSchema,
   simple,
 } from "./common.js";
@@ -138,33 +141,17 @@ const rankRecordSchema = z.object({
     ),
 });
 
-function rejectFeedFilters(kind, provided) {
-  const names = Object.entries(provided)
-    .filter(([, value]) => value != null)
-    .map(([name]) => name);
-
-  if (names.length === 0) {
-    return;
-  }
-
-  throw new Error(
-    `[unsupported_filter] ${names.join(", ")} ${
-      names.length === 1 ? "only applies" : "only apply"
-    } to kind=feeds, not kind=${kind}. Hint: use kind=feeds or remove these arguments.`,
-  );
-}
-
 export function registerFellowshipTools(server) {
   server.registerTool(
     "fellowship_list",
     {
       description:
-        "List Fellowship data on Polkadot Collectives. kind selects the record set: feeds (chronological activity feed with optional section, event, and who filters), applications (membership applications with applicant, status, and detail URL), or members (current roster including rank-0 candidates).",
-      inputSchema: {
+        "List Fellowship data on Polkadot Collectives. Feeds and applications are paginated; section, event, and who apply only to feeds. kind=members returns the full current roster including rank-0 candidates, without pagination.",
+      inputSchema: z.object({
         kind: z
           .enum(["feeds", "applications", "members"])
           .describe("Record set to list: feeds, applications, or members"),
-        ...paginationInputShape,
+        ...optionalPaginationInputShape,
         section: z
           .enum(["fellowshipCore", "fellowshipSalary", "fellowshipReferenda"])
           .optional()
@@ -184,38 +171,45 @@ export function registerFellowshipTools(server) {
           .describe(
             "Only for kind=feeds: filter events by the participant's SS58 address",
           ),
-      },
-      outputSchema: permissiveOutputSchema,
+      }).strict(),
+      outputSchema: paginatedItemsSchema
+        .partial()
+        .extend({ members: z.array(fellowshipMemberSchema).optional() })
+        .passthrough(),
       annotations: readOnlyAnnotations,
     },
     async ({ kind, page, page_size: pageSizeValue, section, event, who }) => {
       if (kind !== "feeds") {
-        rejectFeedFilters(kind, { section, event, who });
+        rejectUnsupportedArguments(
+          `kind=${kind}`,
+          { section, event, who },
+          "Use kind=feeds for these filters.",
+        );
+      }
+      if (kind === "members") {
+        rejectUnsupportedArguments(
+          "kind=members",
+          { page, page_size: pageSizeValue },
+          "Omit pagination; the result contains the whole roster.",
+        );
+        return createStructuredJsonResult({
+          members: await listFellowshipMembers(),
+        });
       }
 
+      const pagination = { page: page ?? 1, page_size: pageSizeValue ?? 25 };
       if (kind === "feeds") {
         return createStructuredJsonResult(
           await listFellowshipFeeds({
-            page,
-            page_size: pageSizeValue,
+            ...pagination,
             section,
             event,
             who,
           }),
         );
       }
-      if (kind === "applications") {
-        return createStructuredJsonResult(
-          await listFellowshipApplications({
-            page,
-            page_size: pageSizeValue,
-          }),
-        );
-      }
 
-      return createStructuredJsonResult({
-        members: await listFellowshipMembers(),
-      });
+      return createStructuredJsonResult(await listFellowshipApplications(pagination));
     },
   );
 
@@ -246,7 +240,7 @@ export function registerFellowshipTools(server) {
     {
       description:
         "List Fellowship activity of one address on Polkadot Collectives. kind=referenda lists referenda it submitted; kind=votes lists its votes, optionally filtered by vote type.",
-      inputSchema: {
+      inputSchema: z.object({
         address: accountAddress.describe(
           "SS58 address whose Fellowship activity to list",
         ),
@@ -254,28 +248,36 @@ export function registerFellowshipTools(server) {
           .enum(["referenda", "votes"])
           .describe("Record set to list: referenda or votes"),
         ...paginationInputShape,
-        includes_title: includesTitle,
+        includes_title: includesTitle.describe(
+          'Only for kind=votes: set to true, "1", "true", or "TRUE" to include the referendum title and state',
+        ),
         type: z
           .enum(["aye", "nay"])
           .optional()
           .describe("Only for kind=votes: filter by vote type"),
-        simple,
-      },
-      outputSchema: permissiveOutputSchema,
+        simple: simple.describe(
+          'Only for kind=referenda: set to true, "1", "true", or "TRUE" for simplified fields',
+        ),
+      }).strict(),
+      outputSchema: paginatedItemsSchema.passthrough(),
       annotations: readOnlyAnnotations,
     },
     async ({ kind, ...args }) => {
-      if (kind === "referenda" && args.type != null) {
-        throw new Error(
-          `[unsupported_filter] type only applies to kind=votes, not kind=${kind}. Hint: remove type or use kind=votes.`,
+      if (kind === "referenda") {
+        rejectUnsupportedArguments(
+          "kind=referenda",
+          { type: args.type, includes_title: args.includes_title },
+          "Use kind=votes for type and includes_title.",
         );
+        return createStructuredJsonResult(await getUserFellowshipReferenda(args));
       }
 
-      return createStructuredJsonResult(
-        kind === "referenda"
-          ? await getUserFellowshipReferenda(args)
-          : await getUserFellowshipVotes(args),
+      rejectUnsupportedArguments(
+        "kind=votes",
+        { simple: args.simple },
+        "Use kind=referenda for simple.",
       );
+      return createStructuredJsonResult(await getUserFellowshipVotes(args));
     },
   );
 
@@ -284,14 +286,14 @@ export function registerFellowshipTools(server) {
     {
       description:
         "Get Fellowship salary and rank statistics. kind selects the view: overview (spending by cycle), by_rank (spending by rank), rank_changes (promotion, demotion, retention counts), member (one address's salary, cycles, and rank history; requires address), or claimants (all salary claimants).",
-      inputSchema: {
+      inputSchema: z.object({
         kind: z
           .enum(["overview", "by_rank", "rank_changes", "member", "claimants"])
           .describe("Statistics view to return"),
         address: accountAddress
           .optional()
           .describe("Required for kind=member"),
-      },
+      }).strict(),
       outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
@@ -307,6 +309,7 @@ export function registerFellowshipTools(server) {
         );
       }
 
+      rejectUnsupportedArguments(`kind=${kind}`, { address }, "Use kind=member for an address.");
       const handlers = {
         overview: getFellowshipSalaryOverview,
         by_rank: getFellowshipSalaryByRank,
