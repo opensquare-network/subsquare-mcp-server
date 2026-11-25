@@ -2,21 +2,18 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import packageJson from "../package.json" with { type: "json" };
 import {
   registerAccountTools,
-  registerAddressFellowshipTools,
-  registerAddressReferendaTools,
-  registerAddressVotesTools,
   registerBlockTools,
   registerBountiesTools,
-  registerCouncilTools,
+  registerCommitteeTools,
   registerDelegationTools,
   registerCoretimeTools,
   registerDemocracyTools,
   registerFellowshipTools,
   registerIdentityTools,
   registerPostsTools,
-  registerReferendaTools,
+  registerCommentTools,
+  registerOpengovTools,
   registerSecretaryTools,
-  registerTechcommTools,
   registerUserTools,
   registerTreasuryTools,
   registerVestingTools,
@@ -45,21 +42,18 @@ export function createMcpServer() {
   );
 
   registerAccountTools(server);
-  registerAddressFellowshipTools(server);
-  registerAddressReferendaTools(server);
-  registerAddressVotesTools(server);
   registerBlockTools(server);
   registerBountiesTools(server);
-  registerCouncilTools(server);
+  registerCommitteeTools(server);
   registerDelegationTools(server);
   registerCoretimeTools(server);
   registerDemocracyTools(server);
   registerFellowshipTools(server);
   registerIdentityTools(server);
   registerPostsTools(server);
-  registerReferendaTools(server);
+  registerCommentTools(server);
+  registerOpengovTools(server);
   registerSecretaryTools(server);
-  registerTechcommTools(server);
   registerUserTools(server);
   registerTreasuryTools(server);
   registerVestingTools(server);

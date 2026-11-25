@@ -3,7 +3,6 @@ import { chains } from "../config/chain.js";
 import {
   USER_CATEGORY_API_PATHS,
   getUserOverview,
-  getUserVoteStats,
   listUserSubmissions,
   listUserVoteCalls,
   listUserVotes,
@@ -14,6 +13,7 @@ import {
   createStructuredJsonResult,
   page,
   pageSize,
+  permissiveOutputSchema,
   readOnlyAnnotations,
 } from "./common.js";
 
@@ -67,6 +67,7 @@ export function registerUserTools(server) {
           modules: userModules,
         })
         .strict(),
+      outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
     async ({ chain, address, modules }) =>
@@ -88,82 +89,49 @@ export function registerUserTools(server) {
             .enum(Object.keys(USER_CATEGORY_API_PATHS))
             .describe("Submission category to list"),
           page,
-          pageSize: userPageSize(20),
+          page_size: userPageSize(20),
         })
         .strict(),
+      outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
-    async ({ chain, address, category, page, pageSize }) =>
+    async ({ chain, address, category, page, page_size: pageSize }) =>
       withUserErrorResult({ chain, address }, () =>
         listUserSubmissions({ chain, address, category, page, pageSize }),
       ),
   );
 
   server.registerTool(
-    "list_user_votes",
+    "list_user_voting",
     {
       description:
-        "List a Subsquare user's votes in one voting module, optionally filtered by vote type.",
+        "List a Subsquare user's votes or vote calls in one voting module, with pagination. kind=votes optionally filters by vote type.",
       inputSchema: z
         .object({
           chain: userChains,
           address: userAddress,
+          kind: z
+            .enum(["votes", "vote_calls"])
+            .describe("Record set to list: votes or vote_calls"),
           module: z.enum(["referenda", "democracy", "fellowship"]),
           type: z
             .enum(["all", "aye", "nay", "split", "abstain"])
             .default("all")
-            .describe("Vote type filter; all omits the backend type parameter"),
+            .describe(
+              "Vote type filter for kind=votes; all omits the backend type parameter",
+            ),
           page,
-          pageSize: userPageSize(25),
+          page_size: userPageSize(25),
         })
         .strict(),
+      outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
-    async ({ chain, address, module, type, page, pageSize }) =>
+    async ({ chain, address, kind, module, type, page, page_size: pageSize }) =>
       withUserErrorResult({ chain, address }, () =>
-        listUserVotes({ chain, address, module, type, page, pageSize }),
-      ),
-  );
-
-  server.registerTool(
-    "list_user_vote_calls",
-    {
-      description:
-        "List a Subsquare user's vote calls in one voting module, with pagination.",
-      inputSchema: z
-        .object({
-          chain: userChains,
-          address: userAddress,
-          module: z.enum(["referenda", "democracy", "fellowship"]),
-          page,
-          pageSize: userPageSize(25),
-        })
-        .strict(),
-      annotations: readOnlyAnnotations,
-    },
-    async ({ chain, address, module, page, pageSize }) =>
-      withUserErrorResult({ chain, address }, () =>
-        listUserVoteCalls({ chain, address, module, page, pageSize }),
-      ),
-  );
-
-  server.registerTool(
-    "get_user_vote_stats",
-    {
-      description:
-        "Get vote statistics for a Subsquare user across selected voting modules.",
-      inputSchema: z
-        .object({
-          chain: userChains,
-          address: userAddress,
-          modules: userModules,
-        })
-        .strict(),
-      annotations: readOnlyAnnotations,
-    },
-    async ({ chain, address, modules }) =>
-      withUserErrorResult({ chain, address }, () =>
-        getUserVoteStats({ chain, address, modules }),
+        kind === "votes"
+          ? listUserVotes({ chain, address, module, type, page, pageSize })
+          : listUserVoteCalls({ chain, address, module, page, pageSize }),
       ),
   );
 }

@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { stateScanChains } from "../../config/chains.js";
 import { getBlockDetail } from "../../services/statescan/block.js";
-import { createJsonResult, readOnlyAnnotations } from "../common.js";
+import {
+  createStructuredJsonResult,
+  permissiveOutputSchema,
+  readOnlyAnnotations,
+} from "../common.js";
 
 const blockId = z
   .union([
@@ -25,8 +29,9 @@ export function registerBlockDetailTool(server) {
         chain,
         block_id: optionalBlockId,
       },
+      outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
-    async (args) => createJsonResult(await getBlockDetail(args)),
+    async (args) => createStructuredJsonResult(await getBlockDetail(args)),
   );
 }

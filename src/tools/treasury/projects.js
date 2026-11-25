@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { getTreasuryProjectDetail } from "../../services/treasury/index.js";
-import { createJsonResult, readOnlyAnnotations } from "../common.js";
+import {
+  createStructuredJsonResult,
+  permissiveOutputSchema,
+  readOnlyAnnotations,
+} from "../common.js";
 
 const projectId = z
   .string()
@@ -22,11 +26,9 @@ export function registerTreasuryProjectTools(server) {
       description:
         "Get one Polkadot Treasury project with its compact linked proposal, spend, tip, bounty, and child bounty details.",
       inputSchema: treasuryProjectDetailInputSchema,
+      outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
-    async (args) => {
-      const result = await getTreasuryProjectDetail(args);
-      return createJsonResult(result);
-    },
+    async (args) => createStructuredJsonResult(await getTreasuryProjectDetail(args)),
   );
 }

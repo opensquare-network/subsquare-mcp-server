@@ -8,11 +8,27 @@ import {
 import {
   accountAddress,
   createStructuredJsonResult,
-  paginatedItemsSchema,
+  includesTitle,
   paginationInputShape,
   readOnlyAnnotations,
+  permissiveOutputSchema,
+  simple,
 } from "./common.js";
-import { registerFellowshipStatisticsTools } from "./fellowship/statistics.js";
+import {
+  getFellowshipMemberStatistics,
+  getFellowshipRankChangeStatistics,
+  getFellowshipSalaryByRank,
+  getFellowshipSalaryOverview,
+  listFellowshipSalaryClaimants,
+} from "../services/fellowship/statistics.js";
+import {
+  getFellowshipTreasuryBalance,
+  getFellowshipTreasuryStatus,
+} from "../services/fellowship/treasury.js";
+import {
+  getUserFellowshipReferenda,
+  getUserFellowshipVotes,
+} from "../services/address.js";
 import { registerFellowshipTreasuryTools } from "./fellowship/treasury.js";
 
 const rankInfoSchema = z.object({
@@ -122,45 +138,38 @@ const rankRecordSchema = z.object({
     ),
 });
 
-const fellowshipMemberDetailOutputSchema = {
-  member: fellowshipMemberSchema
-    .nullable()
-    .describe(
-      "Current Fellowship member or rank-0 candidate profile, or null when the address is not in the current roster.",
-    ),
-  evidenceHistory: paginatedItemsSchema.describe(
-    "Selected compact Fellowship evidence records. CID, title, rank, wish, status, related referendum summaries, and selected block metadata are retained; markdown content and raw payloads are omitted.",
-  ),
-  salaryClaimHistory: paginatedItemsSchema.describe(
-    "Selected compact Fellowship salary records. The cycle index, salary and amount as returned by the API, registration/payment status, beneficiary, historical rank, and block metadata are retained.",
-  ),
-  referendaSubmissionHistory: paginatedItemsSchema.describe(
-    "Selected compact Fellowship referenda submitted by the address. Index, title/summary, track, proposer, activity timestamps, comment count, and state are retained; on-chain call payloads are omitted.",
-  ),
-  voteHistory: paginatedItemsSchema.describe(
-    "Selected compact Fellowship vote records with referendum index, account, aye/nay direction, vote value, query block, title, and state.",
-  ),
-  statistics: memberStatisticsSchema.describe(
-    "Aggregated salary statistics for the address: claimed cycles and totals by asset, joined cycles, and promotion, demotion, and retention counts.",
-  ),
-  rankRecords: z
-    .array(rankRecordSchema)
-    .describe("Unpaginated Fellowship rank event records for the address."),
-};
+function rejectFeedFilters(kind, provided) {
+  const names = Object.entries(provided)
+    .filter(([, value]) => value != null)
+    .map(([name]) => name);
+
+  if (names.length === 0) {
+    return;
+  }
+
+  throw new Error(
+    `[unsupported_filter] ${names.join(", ")} ${
+      names.length === 1 ? "only applies" : "only apply"
+    } to kind=feeds, not kind=${kind}. Hint: use kind=feeds or remove these arguments.`,
+  );
+}
 
 export function registerFellowshipTools(server) {
   server.registerTool(
-    "fellowship_list_feeds",
+    "fellowship_list",
     {
       description:
-        "Browse the chronological Polkadot Technical Fellowship activity feed, with section, exact event, address, and pagination filters.",
+        "List Fellowship data on Polkadot Collectives. kind selects the record set: feeds (chronological activity feed with optional section, event, and who filters), applications (membership applications with applicant, status, and detail URL), or members (current roster including rank-0 candidates).",
       inputSchema: {
+        kind: z
+          .enum(["feeds", "applications", "members"])
+          .describe("Record set to list: feeds, applications, or members"),
         ...paginationInputShape,
         section: z
           .enum(["fellowshipCore", "fellowshipSalary", "fellowshipReferenda"])
           .optional()
           .describe(
-            "Filter by fellowshipCore (membership), fellowshipSalary (salary), or fellowshipReferenda (referenda); omit for all sections",
+            "Only for kind=feeds: filter by fellowshipCore, fellowshipSalary, or fellowshipReferenda; omit for all sections",
           ),
         event: z
           .string()
@@ -168,70 +177,49 @@ export function registerFellowshipTools(server) {
           .min(1)
           .optional()
           .describe(
-            "Exact PascalCase event name, such as Promoted, Voted, Paid, or DecisionStarted; omit for every event",
+            "Only for kind=feeds: exact PascalCase event name, such as Promoted, Voted, Paid, or DecisionStarted",
           ),
         who: accountAddress
           .optional()
-          .describe("Filter events by the participant's SS58 address"),
+          .describe(
+            "Only for kind=feeds: filter events by the participant's SS58 address",
+          ),
       },
-      outputSchema: paginatedItemsSchema.shape,
+      outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
-    async (args) => {
-      const result = await listFellowshipFeeds(args);
-      return createStructuredJsonResult(result);
+    async ({ kind, page, page_size: pageSizeValue, section, event, who }) => {
+      if (kind !== "feeds") {
+        rejectFeedFilters(kind, { section, event, who });
+      }
+
+      if (kind === "feeds") {
+        return createStructuredJsonResult(
+          await listFellowshipFeeds({
+            page,
+            page_size: pageSizeValue,
+            section,
+            event,
+            who,
+          }),
+        );
+      }
+      if (kind === "applications") {
+        return createStructuredJsonResult(
+          await listFellowshipApplications({
+            page,
+            page_size: pageSizeValue,
+          }),
+        );
+      }
+
+      return createStructuredJsonResult({
+        members: await listFellowshipMembers(),
+      });
     },
   );
 
   registerFellowshipTreasuryTools(server);
-  registerFellowshipStatisticsTools(server);
-
-  server.registerTool(
-    "fellowship_list_applications",
-    {
-      description:
-        "List paginated Polkadot Technical Fellowship membership applications on Polkadot Collectives, with applicant, status, and detail URL.",
-      inputSchema: paginationInputShape,
-      outputSchema: {
-        page: z.number().int().positive(),
-        pageSize: z.number().int().positive(),
-        total: z.number().int().nonnegative(),
-        items: z.array(
-          z.object({
-            applicationUid: z.string().optional(),
-            title: z.string().optional(),
-            applicant: z.string().optional(),
-            proposer: z.string().optional(),
-            status: z.string().nullable().optional(),
-            createdAt: z.string().optional(),
-            lastActivityAt: z.string().optional(),
-            commentsCount: z.number().int().nullable().optional(),
-            url: z.string().url().nullable(),
-          }),
-        ),
-      },
-      annotations: readOnlyAnnotations,
-    },
-    async (args) =>
-      createStructuredJsonResult(await listFellowshipApplications(args)),
-  );
-
-  server.registerTool(
-    "fellowship_list_members",
-    {
-      description:
-        "List the current Polkadot Technical Fellowship roster on Polkadot Collectives, including rank-0 candidates.",
-      inputSchema: {},
-      outputSchema: {
-        members: z.array(fellowshipMemberSchema),
-      },
-      annotations: readOnlyAnnotations,
-    },
-    async () => {
-      const result = await listFellowshipMembers();
-      return createStructuredJsonResult({ members: result });
-    },
-  );
 
   server.registerTool(
     "fellowship_get_member_detail",
@@ -244,12 +232,112 @@ export function registerFellowshipTools(server) {
         ),
         ...paginationInputShape,
       },
-      outputSchema: fellowshipMemberDetailOutputSchema,
+      outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
     async (args) => {
       const detail = await getFellowshipMemberDetail(args);
       return createStructuredJsonResult(detail);
     },
+  );
+
+  server.registerTool(
+    "fellowship_list_address_activity",
+    {
+      description:
+        "List Fellowship activity of one address on Polkadot Collectives. kind=referenda lists referenda it submitted; kind=votes lists its votes, optionally filtered by vote type.",
+      inputSchema: {
+        address: accountAddress.describe(
+          "SS58 address whose Fellowship activity to list",
+        ),
+        kind: z
+          .enum(["referenda", "votes"])
+          .describe("Record set to list: referenda or votes"),
+        ...paginationInputShape,
+        includes_title: includesTitle,
+        type: z
+          .enum(["aye", "nay"])
+          .optional()
+          .describe("Only for kind=votes: filter by vote type"),
+        simple,
+      },
+      outputSchema: permissiveOutputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async ({ kind, ...args }) => {
+      if (kind === "referenda" && args.type != null) {
+        throw new Error(
+          `[unsupported_filter] type only applies to kind=votes, not kind=${kind}. Hint: remove type or use kind=votes.`,
+        );
+      }
+
+      return createStructuredJsonResult(
+        kind === "referenda"
+          ? await getUserFellowshipReferenda(args)
+          : await getUserFellowshipVotes(args),
+      );
+    },
+  );
+
+  server.registerTool(
+    "fellowship_salary",
+    {
+      description:
+        "Get Fellowship salary and rank statistics. kind selects the view: overview (spending by cycle), by_rank (spending by rank), rank_changes (promotion, demotion, retention counts), member (one address's salary, cycles, and rank history; requires address), or claimants (all salary claimants).",
+      inputSchema: {
+        kind: z
+          .enum(["overview", "by_rank", "rank_changes", "member", "claimants"])
+          .describe("Statistics view to return"),
+        address: accountAddress
+          .optional()
+          .describe("Required for kind=member"),
+      },
+      outputSchema: permissiveOutputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async ({ kind, address }) => {
+      if (kind === "member") {
+        if (!address) {
+          throw new Error(
+            "[missing_address] kind=member requires address. Hint: pass the SS58 address whose Fellowship salary statistics you need.",
+          );
+        }
+        return createStructuredJsonResult(
+          await getFellowshipMemberStatistics({ address }),
+        );
+      }
+
+      const handlers = {
+        overview: getFellowshipSalaryOverview,
+        by_rank: getFellowshipSalaryByRank,
+        rank_changes: getFellowshipRankChangeStatistics,
+        claimants: async () => ({
+          claimants: await listFellowshipSalaryClaimants(),
+        }),
+      };
+
+      return createStructuredJsonResult(await handlers[kind]());
+    },
+  );
+
+  server.registerTool(
+    "fellowship_treasury_get",
+    {
+      description:
+        "Get Fellowship Treasury data on Polkadot Collectives. view=balance returns DOT/HOLLAR Treasury and USDT/HOLLAR salary balances; view=status returns active and total spend counts.",
+      inputSchema: {
+        view: z
+          .enum(["balance", "status"])
+          .describe("Treasury view to return: balance or status"),
+      },
+      outputSchema: permissiveOutputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async ({ view }) =>
+      createStructuredJsonResult(
+        view === "balance"
+          ? await getFellowshipTreasuryBalance()
+          : await getFellowshipTreasuryStatus(),
+      ),
   );
 }

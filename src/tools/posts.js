@@ -6,6 +6,8 @@ import {
   paginationInputShape,
   readOnlyAnnotations,
   simple,
+  permissiveOutputSchema,
+  paginatedItemsSchema,
 } from "./common.js";
 
 const postChain = z
@@ -34,24 +36,6 @@ const postFields = {
   url: z.string().url().nullable(),
 };
 
-const postsListOutputSchema = {
-  page: z.number().int().positive(),
-  pageSize: z.number().int().positive(),
-  total: z.number().int().nonnegative(),
-  items: z.array(z.object(postFields)),
-};
-
-const postDetailOutputSchema = z.object({
-  ...postFields,
-  updatedAt: z.string().optional(),
-  content: z.string().nullable().optional(),
-  contentType: z.string().optional(),
-  contentVersion: z.string().optional(),
-  dataSource: z.string().optional(),
-  cid: z.string().nullable().optional(),
-  reactions: z.array(z.record(z.unknown())).default([]),
-});
-
 export function registerPostsTools(server) {
   server.registerTool(
     "posts_list_posts",
@@ -69,7 +53,7 @@ export function registerPostsTools(server) {
           .optional()
           .describe("Exact label name to filter by (single label)"),
       },
-      outputSchema: postsListOutputSchema,
+      outputSchema: paginatedItemsSchema.shape,
       annotations: readOnlyAnnotations,
     },
     async (args) => createStructuredJsonResult(await listPosts(args)),
@@ -88,7 +72,7 @@ export function registerPostsTools(server) {
           .min(1)
           .describe("Exact post uid, for example '465'"),
       },
-      outputSchema: postDetailOutputSchema,
+      outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
     async (args) => createStructuredJsonResult(await getPost(args)),

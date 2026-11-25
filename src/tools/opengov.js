@@ -1,20 +1,18 @@
 import { z } from "zod";
-import { subsquareApiChains } from "../../config/chains.js";
+import { subsquareApiChains } from "../config/chains.js";
 import {
-  getReferenda,
-  getReferendaSummary,
   getReferendum,
-  listReferendaTracks,
-} from "../../services/referenda/index.js";
+  listReferenda,
+  listTracks,
+} from "../services/opengov/index.js";
 import {
   chain,
-  createJsonResult,
   createStructuredJsonResult,
   paginationInputShape,
+  permissiveOutputSchema,
   readOnlyAnnotations,
   simple,
-} from "../common.js";
-import { registerReferendaCommentTools } from "./comments.js";
+} from "./common.js";
 
 const activeStates = [
   "Preparing",
@@ -62,11 +60,48 @@ const referendaListInputSchema = {
     .enum(["index_asc", "index_desc"])
     .optional()
     .describe("Sort by referendum index"),
+  proposer: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe(
+      "Only referenda proposed by this address or username. Routes to the user-scoped endpoint, so it cannot be combined with referendum_index, status, ongoing, is_treasury, includes_timeline, or sort; not available on collectives",
+    ),
   simple,
 };
 
-export function registerReferendaTools(server) {
-  registerReferendaCommentTools(server);
+export function registerOpengovTools(server) {
+  server.registerTool(
+    "opengov_list_referenda",
+    {
+      description:
+        "List and filter OpenGov referenda (on-chain governance proposals) on a configured chain, or list one proposer's referenda with `proposer`. The response also includes chain-wide state counts as `summary`, merged from the former separate summary tool.",
+      inputSchema: referendaListInputSchema,
+      outputSchema: permissiveOutputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async (args) => createStructuredJsonResult(await listReferenda(args)),
+  );
+
+  server.registerTool(
+    "opengov_referendum_detail",
+    {
+      description:
+        "Get the full details of one OpenGov referendum by its index.",
+      inputSchema: {
+        chain,
+        referendum_index: z
+          .number()
+          .int()
+          .nonnegative()
+          .describe("The exact governance referendum index"),
+      },
+      outputSchema: permissiveOutputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async (args) => createStructuredJsonResult(await getReferendum(args)),
+  );
 
   server.registerTool(
     "opengov_list_tracks",
@@ -102,55 +137,7 @@ export function registerReferendaTools(server) {
       },
       annotations: readOnlyAnnotations,
     },
-    async (args) => createStructuredJsonResult(await listReferendaTracks(args)),
+    async (args) => createStructuredJsonResult(await listTracks(args)),
   );
 
-  server.registerTool(
-    "opengov_list_referenda",
-    {
-      description:
-        "List and filter OpenGov referenda (on-chain governance proposals) on a configured chain.",
-      inputSchema: referendaListInputSchema,
-      annotations: readOnlyAnnotations,
-    },
-    async (args) => {
-      const result = await getReferenda(args);
-      return createJsonResult(result);
-    },
-  );
-
-  server.registerTool(
-    "opengov_referendum_detail",
-    {
-      description:
-        "Get the full details of one OpenGov referendum by its index.",
-      inputSchema: {
-        chain,
-        referendum_index: z
-          .number()
-          .int()
-          .nonnegative()
-          .describe("The exact governance referendum index"),
-      },
-      annotations: readOnlyAnnotations,
-    },
-    async (args) => {
-      const result = await getReferendum(args);
-      return createJsonResult(result);
-    },
-  );
-
-  server.registerTool(
-    "opengov_referenda_summary",
-    {
-      description:
-        "Summarize OpenGov referendum activity (such as status counts) for a chain.",
-      inputSchema: { chain },
-      annotations: readOnlyAnnotations,
-    },
-    async ({ chain }) => {
-      const result = await getReferendaSummary({ chain });
-      return createJsonResult(result);
-    },
-  );
 }

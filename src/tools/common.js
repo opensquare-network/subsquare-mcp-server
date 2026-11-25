@@ -22,25 +22,15 @@ export const paginationInputShape = {
 };
 
 export const paginatedItemsSchema = z.object({
-  items: z
-    .array(z.object({}).passthrough())
-    .describe("Paginated records; fields vary by endpoint"),
-  page: z
-    .number()
-    .int()
-    .positive()
-    .describe("Page number returned by SubSquare"),
-  pageSize: z
-    .number()
-    .int()
-    .positive()
-    .describe("Page size returned by SubSquare"),
-  total: z
-    .number()
-    .int()
-    .nonnegative()
-    .describe("Total number of matching records"),
+  items: z.array(z.object({}).passthrough()),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  total: z.number().int().nonnegative(),
 });
+
+// Structured content is still returned; the schema stays permissive for deep or
+// fast-moving payloads so tools/list stays small.
+export const permissiveOutputSchema = z.object({}).passthrough();
 
 export const accountAddress = z
   .string()
@@ -70,21 +60,16 @@ export const readOnlyAnnotations = {
   readOnlyHint: true,
 };
 
-function createJsonTextContent(data) {
-  return {
-    type: "text",
-    text: JSON.stringify(data),
-  };
-}
-
-export function createJsonResult(data) {
-  return {
-    content: [createJsonTextContent(data)],
-  };
-}
-
+// Every tool returns the payload as structuredContent and mirrors it as text so
+// clients that only read content still receive the data.
 export function createStructuredJsonResult(data) {
   return {
     structuredContent: data,
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(data),
+      },
+    ],
   };
 }

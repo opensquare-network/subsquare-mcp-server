@@ -6,6 +6,7 @@ import {
   createStructuredJsonResult,
   pageSize,
   readOnlyAnnotations,
+  permissiveOutputSchema,
 } from "./common.js";
 
 const chain = z
@@ -47,24 +48,7 @@ export function registerVestingTools(server) {
       description:
         "Get an account's actual Vesting lock, currently unlockable amount and all schedules with release end heights. Uses a finalized Asset Hub snapshot and its relay-chain height. An account without schedules or a Vesting lock returns zero totals and an empty schedules array.",
       inputSchema: { chain, address: accountAddress },
-      outputSchema: {
-        ...snapshotFields,
-        ...accountFields,
-        schedules: z.array(
-          z.object({
-            startingBlock: height,
-            endingBlock: height,
-            perBlock: amount.describe(
-              "Stored release rate; the runtime treats zero as one base unit per block",
-            ),
-            locked: amount,
-            lockedNow: amount,
-            vested: amount.describe(
-              "Cumulative vested amount, capped at locked; includes amounts already unlocked",
-            ),
-          }),
-        ),
-      },
+      outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
     async (args) => createStructuredJsonResult(await getAccountVesting(args)),
@@ -103,20 +87,7 @@ export function registerVestingTools(server) {
             "Case-sensitive substring of the returned account address; no identity-name search",
           ),
       },
-      outputSchema: {
-        ...snapshotFields,
-        total: z
-          .number()
-          .int()
-          .nonnegative()
-          .describe("Total accounts matching the address filter"),
-        limit: z.number().int().positive(),
-        nextCursor: z
-          .string()
-          .nullable()
-          .describe("Next page cursor; null on the last page"),
-        items: z.array(z.object(accountFields)),
-      },
+      outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
     async (args) => createStructuredJsonResult(await listVestingAccounts(args)),
