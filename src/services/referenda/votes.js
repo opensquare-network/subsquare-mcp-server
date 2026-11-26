@@ -1,4 +1,4 @@
-import { request } from "../api.js";
+import { ApiRequestError, request } from "../api.js";
 import { resolveItemIdentities } from "../identity.js";
 import { getReferendumVoteEndpoints } from "../opengov/paths.js";
 
@@ -123,20 +123,23 @@ function compareVotes(left, right) {
 
 export async function listReferendumVotes({
   chain,
-  referendum_type: referendumType,
-  referendum_index: referendumIndex,
+  referendumType,
+  referendumIndex,
   page = 1,
-  page_size: pageSize = 25,
-  include_tally_history: includeTallyHistory = false,
-  tally_limit: tallyLimit = 50,
+  pageSize = 25,
+  includeStats = true,
+  includeTallyHistory = false,
+  tallyLimit = 50,
 } = {}) {
   const { votesUrl, statsUrl, tallyHistoryUrl } = getReferendumVoteEndpoints(
     chain, referendumType, referendumIndex,
   );
 
-  const [votesResponse, statsResponse, tallyResponse] = await Promise.all([
+  const [votesResponse, statsResult, tallyResponse] = await Promise.all([
     request.get(votesUrl),
-    statsUrl ? request.get(statsUrl) : null,
+    statsUrl && includeStats
+      ? loadVoteStats(statsUrl)
+      : { stats: null, statsStatus: statsUrl ? "not_requested" : "unsupported" },
     includeTallyHistory ? request.get(tallyHistoryUrl) : null,
   ]);
 
@@ -144,9 +147,6 @@ export async function listReferendumVotes({
     throw new Error(
       `[invalid_upstream_response] SubSquare ${referendumType} referendum votes response was not an array`,
     );
-  }
-  if (statsUrl && (!statsResponse || typeof statsResponse !== "object" || Array.isArray(statsResponse))) {
-    throw new Error("[invalid_upstream_response] SubSquare vote statistics response was not an object");
   }
   if (includeTallyHistory && !Array.isArray(tallyResponse)) {
     throw new Error("[invalid_upstream_response] SubSquare tally history response was not an array");
@@ -156,10 +156,6 @@ export async function listReferendumVotes({
   const start = (page - 1) * pageSize;
   const items = sortedVotes.slice(start, start + pageSize);
   const identities = await resolveItemIdentities(chain, items);
-  const stats =
-    statsResponse && Object.keys(statsResponse).length > 0
-      ? statsResponse
-      : null;
 
   return {
     chain,
@@ -169,7 +165,7 @@ export async function listReferendumVotes({
     page,
     pageSize,
     summary: createVoteSummary(sortedVotes),
-    stats: stats ? compactVoteStats(stats) : null,
+    ...statsResult,
     tallyHistory: includeTallyHistory
       ? compactTallyHistory(tallyResponse, tallyLimit)
       : null,
@@ -177,6 +173,29 @@ export async function listReferendumVotes({
     items,
     source: votesUrl.toString(),
   };
+}
+
+async function loadVoteStats(url) {
+  let stats;
+  try {
+    stats = await request.get(url);
+  } catch (error) {
+    if (!(error instanceof ApiRequestError)) {
+      throw error;
+    }
+
+    console.warn(`Unable to query vote statistics at ${url}:`, error.message);
+    return { stats: null, statsStatus: "unavailable" };
+  }
+
+  if (!stats || typeof stats !== "object" || Array.isArray(stats)) {
+    throw new Error("[invalid_upstream_response] SubSquare vote statistics response was not an object");
+  }
+  if (Object.keys(stats).length === 0) {
+    return { stats: null, statsStatus: "unavailable" };
+  }
+
+  return { stats: compactVoteStats(stats), statsStatus: "available" };
 }
 
 function compactVoteStats(stats) {

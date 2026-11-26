@@ -39,6 +39,24 @@ const beneficiarySchema = z.object({
   childBounties: benefitCountsSchema,
 });
 
+const benefitModulePageSchema = paginatedItemsSchema.extend({
+  module: benefitModule,
+  supported: z.literal(true),
+  source: z.string(),
+});
+
+const benefitModuleOutputSchema = z.discriminatedUnion("supported", [
+  benefitModulePageSchema,
+  benefitModulePageSchema.extend({
+    supported: z.literal(false),
+    page: z.null(),
+    pageSize: z.null(),
+    total: z.null(),
+    items: z.null(),
+    error: z.string(),
+  }),
+]);
+
 export function registerTreasuryBeneficiaryTools(server) {
   server.registerTool(
     "get_address_treasury_benefits",
@@ -62,14 +80,7 @@ export function registerTreasuryBeneficiaryTools(server) {
         address: z.string(),
         isBeneficiary: z.boolean(),
         summary: beneficiarySchema.nullable(),
-        modules: z.array(
-          paginatedItemsSchema.extend({
-            module: benefitModule,
-            supported: z.boolean(),
-            source: z.string(),
-            error: z.string().optional(),
-          }),
-        ),
+        modules: z.array(benefitModuleOutputSchema),
         source: z.array(z.string()),
       },
       annotations: readOnlyAnnotations,

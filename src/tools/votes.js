@@ -61,6 +61,7 @@ const votesOutputSchema = paginatedItemsSchema.extend({
   referendumIndex: z.number().int().nonnegative(),
   summary: voteSummarySchema,
   stats: voteStatsSchema.nullable(),
+  statsStatus: z.enum(["available", "not_requested", "unavailable", "unsupported"]),
   tallyHistory: z
     .object({
       total: z.number().int().nonnegative(),
@@ -81,7 +82,7 @@ export function registerReferendumVoteTools(server) {
     "list_referendum_votes",
     {
       description:
-        "List votes cast on one OpenGov or Fellowship referendum, sorted by voting power. Returns referendum-wide vote counts, balances, conviction distribution, and turnout statistics when available for OpenGov. Optionally include tally history. OpenGov balances and votes use chain base units.",
+        "List votes on one OpenGov or Fellowship referendum, sorted by voting power, with referendum-wide counts, balances, and conviction distribution. OpenGov turnout statistics are included when available; set include_stats=false to skip that lookup. Optionally include tally history. OpenGov amounts use chain base units.",
       inputSchema: z.object({
         chain: z
           .enum(subsquareApiChains)
@@ -89,6 +90,10 @@ export function registerReferendumVoteTools(server) {
         referendum_type: referendumType.describe("Referendum type to query"),
         referendum_index: z.number().int().nonnegative().describe("The exact referendum index"),
         ...paginationInputShape,
+        include_stats: z
+          .boolean()
+          .optional()
+          .describe("Only for OpenGov: include indexed turnout statistics (default true)"),
         include_tally_history: z
           .boolean()
           .default(false)
@@ -104,8 +109,16 @@ export function registerReferendumVoteTools(server) {
       outputSchema: votesOutputSchema,
       annotations: readOnlyAnnotations,
     },
-    async (args) => {
-      const { chain, referendum_type: type, include_tally_history, tally_limit } = args;
+    async ({
+      chain,
+      referendum_type: type,
+      referendum_index: referendumIndex,
+      page,
+      page_size: pageSize,
+      include_stats: includeStats,
+      include_tally_history: includeTallyHistory,
+      tally_limit: tallyLimit,
+    }) => {
       const supportedChains = voteChains[type];
       if (!supportedChains.includes(chain)) {
         throw new Error(
@@ -113,15 +126,34 @@ export function registerReferendumVoteTools(server) {
         );
       }
 
-      if (!include_tally_history) {
+      if (type !== "opengov") {
+        rejectUnsupportedArguments(
+          `referendum_type=${type}`,
+          { include_stats: includeStats },
+          "Use include_stats only for OpenGov referenda.",
+        );
+      }
+
+      if (!includeTallyHistory) {
         rejectUnsupportedArguments(
           "include_tally_history=false",
-          { tally_limit },
+          { tally_limit: tallyLimit },
           "Set include_tally_history to true to limit tally records.",
         );
       }
 
-      return createStructuredJsonResult(await listReferendumVotes(args));
+      return createStructuredJsonResult(
+        await listReferendumVotes({
+          chain,
+          referendumType: type,
+          referendumIndex,
+          page,
+          pageSize,
+          includeStats,
+          includeTallyHistory,
+          tallyLimit,
+        }),
+      );
     },
   );
 }

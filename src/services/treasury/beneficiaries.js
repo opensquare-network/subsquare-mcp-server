@@ -151,10 +151,10 @@ async function fetchBenefitModule({ chain, address, moduleName, page, pageSize }
     return {
       module: moduleName,
       supported: false,
-      page,
-      pageSize,
-      total: 0,
-      items: [],
+      page: null,
+      pageSize: null,
+      total: null,
+      items: null,
       source: endpoint.toString(),
       error: error.message,
     };

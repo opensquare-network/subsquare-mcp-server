@@ -1,6 +1,7 @@
 import pick from "lodash/pick.js";
 import { getChainConfig } from "../config/chains.js";
 import { request } from "./api.js";
+import { summarizeTreasuryProject } from "./treasury/projects/fetch.js";
 
 const FULL_TEXT_CONTENT_LIMIT = 400;
 
@@ -104,6 +105,13 @@ function createGroupUrl(groupName, item, siteUrl) {
 }
 
 function compactSearchItem(groupName, item, siteUrl) {
+  if (groupName === "projects") {
+    return summarizeTreasuryProject(item);
+  }
+  if (groupName === "wiki") {
+    return compactWikiItem(item);
+  }
+
   const { trackInfo, ...itemFields } = pick(item, ITEM_FIELDS);
 
   return {
@@ -214,7 +222,7 @@ export async function searchFullText({ chain, text, max } = {}) {
   }
 
   const items = response.items.map((item) => compactFullTextItem(item, siteUrl));
-  const projects = response.projects.map((item) => compactSearchItem("projects", item, siteUrl));
+  const projects = response.projects.map(summarizeTreasuryProject);
   const wiki = response.wiki.map(compactWikiItem);
 
   return {
