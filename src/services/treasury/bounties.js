@@ -3,6 +3,7 @@ import pick from "lodash/pick.js";
 import upperFirst from "lodash/upperFirst.js";
 import { getAsset } from "../../config/assets.js";
 import { chains } from "../../config/chain.js";
+import { requirePaginatedResponse } from "../../utils/pagination.js";
 import { request } from "../api.js";
 import { createIdentityResolver } from "../identity.js";
 import {
@@ -60,23 +61,24 @@ export function listActiveMultiAssetBounties({
   );
 }
 
-export function listInactiveMultiAssetBounties({
+export async function listInactiveMultiAssetBounties({
   chain = chains.polkadot,
   ...query
 } = {}) {
-  return request.get(
+  const response = await request.get(
     createTreasuryUrl(`${MULTI_ASSET_BOUNTIES_API_PATH}/inactive`, chain),
     { ...query, simple: true },
   );
+  return requirePaginatedResponse(response, "SubSquare inactive Multi-Asset Bounties");
 }
 
-export function listMultiAssetChildBounties({
+export async function listMultiAssetChildBounties({
   chain = chains.polkadot,
   parentBountyId,
   status,
   ...query
 } = {}) {
-  return request.get(
+  const response = await request.get(
     createTreasuryUrl(MULTI_ASSET_CHILD_BOUNTIES_API_PATH, chain),
     {
       ...query,
@@ -85,6 +87,7 @@ export function listMultiAssetChildBounties({
       simple: true,
     },
   );
+  return requirePaginatedResponse(response, "SubSquare Multi-Asset Child Bounties");
 }
 
 export function getBountyStatistics({

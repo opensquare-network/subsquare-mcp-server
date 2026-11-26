@@ -1,149 +1,131 @@
 import { z } from "zod";
-import { chains } from "../config/chain.js";
+import { opengovChains } from "../config/chains.js";
 import {
   getDelegateDelegators,
   listDelegates,
   listDelegations,
+  listTrackDelegatees,
 } from "../services/delegation.js";
 import {
   accountAddress,
-  chain,
   createStructuredJsonResult,
+  page,
   paginatedItemsSchema,
-  paginationInputShape,
   readOnlyAnnotations,
+  rejectUnsupportedArguments,
 } from "./common.js";
 
-const opengovChain = chain.extract([
-  chains.polkadot,
-  chains.kusama,
-  chains.hydration,
-]);
+const opengovChain = z
+  .enum(opengovChains)
+  .describe("OpenGov chain to query: polkadot, kusama, or hydration");
 
-const delegationSchema = z.object({
-  delegator: accountAddress.describe("Address delegating voting power"),
-  delegatee: accountAddress.describe("Address receiving the delegation"),
-  track_id: z.number().int().nonnegative().describe("OpenGov track ID"),
-  balance: z.string().describe("Delegated balance in chain base units"),
-  conviction: z.number().int().nonnegative().describe("Conviction lock level"),
-  votes: z.string().describe("Conviction-weighted voting power in base units"),
-});
-
-const identitiesSchema = z
-  .record(
-    z.string().describe("Address"),
-    z.object({
-      status: z.string().optional().describe("Identity verification status"),
-      display: z.string().optional().describe("Display name, when available"),
-    }),
-  )
-  .describe(
-    "Addresses mapped to identity info; only addresses with a registered identity appear",
-  );
-
-const delegatorsSummarySchema = z.object({
-  delegationCount: z
-    .number()
-    .int()
-    .nonnegative()
-    .describe("Total delegation records across all tracks for this delegate"),
-  delegatorCount: z
-    .number()
-    .int()
-    .nonnegative()
-    .describe("Unique delegator addresses across all tracks"),
-  trackCount: z
-    .number()
-    .int()
-    .nonnegative()
-    .describe("Number of distinct tracks with delegations"),
-  totalBalance: z
-    .string()
-    .describe("Sum of all delegated balances in chain base units"),
-  totalVotes: z
-    .string()
-    .describe("Sum of all conviction-weighted votes in chain base units"),
-});
+const pageSize = z
+  .number()
+  .int()
+  .positive()
+  .max(200)
+  .optional()
+  .describe("Items per page: default 100 for delegators, 25 for other views. Maximum 200 except for track_delegatees (100)");
 
 export function registerDelegationTools(server) {
   server.registerTool(
-    "list_delegates",
+    "opengov_list_delegations",
     {
       description:
-        "List paginated OpenGov delegates with their addresses, delegation statistics, and available profile information.",
-      inputSchema: { chain: opengovChain, ...paginationInputShape },
-      outputSchema: paginatedItemsSchema.shape,
-      annotations: readOnlyAnnotations,
-    },
-    async (args) => createStructuredJsonResult(await listDelegates(args)),
-  );
-
-  server.registerTool(
-    "get_delegate_delegators",
-    {
-      description:
-        "Get OpenGov delegation relationships received by a delegate. Paginated server-side with caching; optionally filter by one track. summary aggregates all matching delegations; identities maps addresses to display/status.",
-      inputSchema: {
+        "List OpenGov delegation data. view=delegates lists delegates with available profiles; delegators lists one delegate's delegators; track lists individual delegation relationships; track_delegatees lists one track's delegatees with their combined delegated capital and voting power.",
+      inputSchema: z.object({
         chain: opengovChain,
-        address: accountAddress.describe(
-          "Delegate address receiving voting power",
-        ),
+        view: z
+          .enum(["delegates", "delegators", "track", "track_delegatees"])
+          .describe("Record set to list"),
+        address: accountAddress
+          .optional()
+          .describe("Required for view=delegators: the delegate address"),
         track_id: z
           .number()
           .int()
           .nonnegative()
           .optional()
           .describe(
-            "Optional OpenGov track ID to filter delegations to one track",
+            "Required for track and track_delegatees; optional filter for delegators",
           ),
-        page: z
-          .number()
-          .int()
-          .positive()
-          .default(1)
-          .describe("Page number, starts at 1 (default 1)"),
-        page_size: z
-          .number()
-          .int()
-          .positive()
-          .max(200)
-          .default(100)
-          .describe("Items per page (default 100, max 200)"),
-      },
-      outputSchema: {
-        page: z.number().int().positive(),
-        pageSize: z.number().int().positive(),
-        total: z.number().int().nonnegative(),
-        items: z.array(delegationSchema),
-        identities: identitiesSchema,
-        summary: delegatorsSummarySchema,
-      },
+        sort_by: z
+          .enum(["delegatedVotes", "delegatedCapital", "delegatorsCount"])
+          .optional()
+          .describe("Only for track_delegatees: field to sort by (default delegatedVotes)"),
+        sort_order: z
+          .enum(["asc", "desc"])
+          .optional()
+          .describe("Only for track_delegatees: sort direction (default desc)"),
+        page,
+        page_size: pageSize,
+      }).strict(),
+      outputSchema: paginatedItemsSchema.passthrough(),
       annotations: readOnlyAnnotations,
     },
-    async (args) =>
-      createStructuredJsonResult(await getDelegateDelegators(args)),
-  );
+    async ({ view, chain, address, track_id: trackId, page, page_size, sort_by, sort_order }) => {
+      const pageSizeValue = page_size ?? (view === "delegators" ? 100 : 25);
+      if (view !== "track_delegatees") {
+        rejectUnsupportedArguments(
+          `view=${view}`,
+          { sort_by, sort_order },
+          "Use sort_by and sort_order only for view=track_delegatees.",
+        );
+      }
 
-  server.registerTool(
-    "list_delegations",
-    {
-      description:
-        "List paginated OpenGov delegation relationships for one required track. Each item describes delegator -> delegatee with balance, conviction, and votes; identities maps addresses to display/status.",
-      inputSchema: {
-        chain: opengovChain,
-        track_id: z
-          .number()
-          .int()
-          .nonnegative()
-          .describe("Required OpenGov track ID; queries only this track"),
-        ...paginationInputShape,
-      },
-      outputSchema: paginatedItemsSchema.extend({
-        items: z.array(delegationSchema),
-        identities: identitiesSchema,
-      }).shape,
-      annotations: readOnlyAnnotations,
+      if (view === "delegators") {
+        if (!address) {
+          throw new Error(
+            "[missing_address] view=delegators requires address. Hint: pass the delegate SS58 address, optionally with track_id.",
+          );
+        }
+        return createStructuredJsonResult(
+          await getDelegateDelegators({
+            chain,
+            address,
+            track_id: trackId,
+            page,
+            page_size: pageSizeValue,
+          }),
+        );
+      }
+
+      if (view === "track" || view === "track_delegatees") {
+        rejectUnsupportedArguments(
+          `view=${view}`,
+          { address },
+          "Use view=delegators for an address lookup.",
+        );
+        if (trackId == null) {
+          throw new Error(
+            `[missing_track_id] view=${view} requires track_id. Hint: call opengov_list_tracks to find track IDs.`,
+          );
+        }
+        const query = { chain, track_id: trackId, page, page_size: pageSizeValue };
+        if (view === "track_delegatees") {
+          if (pageSizeValue > 100) {
+            throw new Error(
+              "[invalid_page_size] view=track_delegatees requires page_size of at most 100. Hint: request more pages instead.",
+            );
+          }
+          return createStructuredJsonResult(
+            await listTrackDelegatees({ ...query, sort_by, sort_order }),
+          );
+        }
+
+        return createStructuredJsonResult(
+          await listDelegations(query),
+        );
+      }
+
+      rejectUnsupportedArguments(
+        "view=delegates",
+        { address, track_id: trackId },
+        "Use view=delegators for an address or view=track for a track.",
+      );
+      return createStructuredJsonResult(
+        await listDelegates({ chain, page, page_size: pageSizeValue }),
+      );
     },
-    async (args) => createStructuredJsonResult(await listDelegations(args)),
   );
 }

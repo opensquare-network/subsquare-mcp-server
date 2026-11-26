@@ -1,9 +1,13 @@
 import { z } from "zod";
 import {
+  blockContentsPageSchema,
   listBlockEvents,
   listBlockExtrinsics,
 } from "../../services/statescan/blockContents.js";
-import { createJsonResult, readOnlyAnnotations } from "../common.js";
+import {
+  createStructuredJsonResult,
+  readOnlyAnnotations,
+} from "../common.js";
 import { chain } from "./block.js";
 
 const paginationInputShape = {
@@ -46,32 +50,26 @@ const filterInputShape = {
 
 export function registerBlockContentsTools(server) {
   server.registerTool(
-    "block_list_events",
+    "block_list",
     {
       description:
-        "List StateScan events; identities maps known addresses to display/status.",
+        "List StateScan events or extrinsics with section, method, and block/date filters; identities maps known addresses to display/status. kind selects the record set: events or extrinsics.",
       inputSchema: {
         chain,
+        kind: z
+          .enum(["events", "extrinsics"])
+          .describe("Record set to list: events or extrinsics"),
         ...paginationInputShape,
         ...filterInputShape,
       },
+      outputSchema: blockContentsPageSchema.passthrough(),
       annotations: readOnlyAnnotations,
     },
-    async (args) => createJsonResult(await listBlockEvents(args)),
-  );
-
-  server.registerTool(
-    "block_list_extrinsics",
-    {
-      description:
-        "List StateScan extrinsics; identities maps known addresses to display/status.",
-      inputSchema: {
-        chain,
-        ...paginationInputShape,
-        ...filterInputShape,
-      },
-      annotations: readOnlyAnnotations,
-    },
-    async (args) => createJsonResult(await listBlockExtrinsics(args)),
+    async ({ kind, ...args }) =>
+      createStructuredJsonResult(
+        kind === "events"
+          ? await listBlockEvents(args)
+          : await listBlockExtrinsics(args),
+      ),
   );
 }

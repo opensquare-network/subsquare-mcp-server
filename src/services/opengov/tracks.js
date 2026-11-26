@@ -11,22 +11,14 @@ function toPercent(ratio) {
   return Number((ratio * 100).toFixed(4));
 }
 
-function toBigInt(value) {
-  try {
-    return BigInt(value ?? 0);
-  } catch {
-    return 0n;
-  }
-}
-
-function toRatioPercent(numerator, denominator) {
-  const num = toBigInt(numerator);
-  const den = toBigInt(denominator);
-  if (den === 0n) {
+function getApprovalPercent(ayes, nays) {
+  if (ayes == null || nays == null) {
     return null;
   }
 
-  return Number((num * 1_000_000n) / den) / 10_000;
+  const ayeVotes = BigInt(ayes);
+  const total = ayeVotes + BigInt(nays);
+  return total === 0n ? null : Number((ayeVotes * 1_000_000n) / total) / 10_000;
 }
 
 function getTrackStatistics(track) {
@@ -49,18 +41,17 @@ export async function listTrackStatistics({ chain } = {}) {
     request.get(tracksUrl),
   ]);
 
-  const trackTurnouts = Array.isArray(summary?.trackTurnouts)
-    ? summary.trackTurnouts
-    : [];
-  const trackCounts = Array.isArray(summary?.trackReferendaCounts)
-    ? summary.trackReferendaCounts
-    : [];
-  const trackDelegations = Array.isArray(tracks) ? tracks : [];
+  if (!Array.isArray(summary?.trackTurnouts) || !Array.isArray(summary.trackReferendaCounts)) {
+    throw new Error("[invalid_upstream_response] SubSquare statistics response did not include track turnout and count arrays");
+  }
+  if (!Array.isArray(tracks)) {
+    throw new Error("[invalid_upstream_response] SubSquare track delegations response was not an array");
+  }
 
-  const turnoutById = new Map(trackTurnouts.map((track) => [track.id, track]));
-  const countById = new Map(trackCounts.map((track) => [track.id, track]));
+  const turnoutById = new Map(summary.trackTurnouts.map((track) => [track.id, track]));
+  const countById = new Map(summary.trackReferendaCounts.map((track) => [track.id, track]));
   const delegationById = new Map(
-    trackDelegations.map((track) => [track.trackId ?? track.id, track]),
+    tracks.map((track) => [track.trackId ?? track.id, track]),
   );
 
   const trackIds = [
@@ -91,10 +82,17 @@ export async function listTrackStatistics({ chain } = {}) {
     };
   });
 
+  const { delegation } = summary;
   return {
     chain,
-    totalReferendaCount: summary?.totalReferendaCount ?? null,
-    delegation: summary?.delegation ?? null,
+    totalReferendaCount: summary.totalReferendaCount ?? null,
+    delegation: delegation && Object.keys(delegation).length > 0
+      ? {
+          delegator: delegation.delegator ?? null,
+          delegatee: delegation.delegatee ?? null,
+          capital: delegation.capital ?? null,
+        }
+      : null,
     total: items.length,
     items,
     source: [summaryUrl.toString(), tracksUrl.toString()],
@@ -113,7 +111,7 @@ function compactTurnoutItem(item) {
     support: item.support ?? null,
     electorate: item.electorate ?? null,
     turnoutPercent: toPercent(item.percentage),
-    approvalPercent: toRatioPercent(ayes, toBigInt(ayes) + toBigInt(nays)),
+    approvalPercent: getApprovalPercent(ayes, nays),
     directAddresses: item.directAddresses ?? null,
     delegationAddresses: item.delegationAddresses ?? null,
     directCapital: item.directCapital ?? null,
@@ -131,54 +129,14 @@ export async function getTrackTurnout({
   const response = await request.get(endpoint);
 
   if (!Array.isArray(response)) {
-    throw new Error("SubSquare track turnout response was not an array");
-  }
-
-  const normalized = response.map(compactTurnoutItem);
-  const trimmed = normalized.slice(-Math.max(limit, 1));
-
-  return {
-    chain,
-    trackId,
-    total: normalized.length,
-    items: trimmed,
-    source: endpoint.toString(),
-  };
-}
-
-export async function listTrackDelegatees({
-  chain,
-  track_id: trackId,
-  page = 1,
-  page_size: pageSize = 25,
-  sort_by: sortBy = "delegatedVotes",
-  sort_order: sortOrder = "desc",
-} = {}) {
-  const { apiUrl } = getChainConfig(chain);
-  const endpoint = new URL(`referenda/tracks/${trackId}/delegatee`, apiUrl);
-  const response = await request.get(endpoint, {
-    page,
-    page_size: pageSize,
-    sort: JSON.stringify([sortBy, sortOrder]),
-  });
-
-  if (!Array.isArray(response?.items)) {
-    throw new Error("SubSquare track delegatee response did not include items");
+    throw new Error("[invalid_upstream_response] SubSquare track turnout response was not an array");
   }
 
   return {
     chain,
     trackId,
-    page: response.page ?? page,
-    pageSize: response.pageSize ?? pageSize,
-    total: response.total ?? response.items.length,
-    items: response.items.map((item) => ({
-      account: item.account ?? null,
-      trackId: item.trackId ?? null,
-      delegatorsCount: item.delegatorsCount ?? null,
-      delegatedCapital: item.delegatedCapital ?? null,
-      delegatedVotes: item.delegatedVotes ?? null,
-    })),
+    total: response.length,
+    items: response.slice(-limit).map(compactTurnoutItem),
     source: endpoint.toString(),
   };
 }

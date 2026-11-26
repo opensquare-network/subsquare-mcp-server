@@ -53,6 +53,7 @@ const chainApiEndpoints = {
 };
 
 export const subsquareApiChains = Object.keys(chainApiEndpoints);
+export const opengovChains = [chains.polkadot, chains.kusama, chains.hydration];
 
 const chainSiteEndpoints = {
   [chains.polkadot]: "https://polkadot.subsquare.io",

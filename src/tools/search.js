@@ -2,7 +2,7 @@ import { z } from "zod";
 import { chains } from "../config/chain.js";
 import { subsquareApiChains } from "../config/chains.js";
 import { searchFullText, searchGovernance } from "../services/search.js";
-import { createJsonResult, readOnlyAnnotations } from "./common.js";
+import { createStructuredJsonResult, readOnlyAnnotations } from "./common.js";
 
 const searchText = z
   .string()
@@ -23,33 +23,35 @@ export function registerSearchTools(server) {
     "gov_search",
     {
       description:
-        "Search governance content by keyword across governance modules on a configured chain: OpenGov and Democracy referenda, treasury proposals, spends, tips, bounties, child bounties, fellowship referenda, treasury projects, and Polkadot Wiki articles. Results are grouped by module with compact fields and detail URLs. Matching is exact text based, not semantic.",
-      inputSchema: {
+        "Search Subsquare governance content. mode=keyword matches text across modules such as referenda, treasury, and Fellowship, with results grouped by module. mode=full_text searches posts and comments with highlighted snippets on Polkadot. Projects and Wiki articles are included where available.",
+      inputSchema: z.object({
         chain: z
           .enum(subsquareApiChains)
           .describe("Chain whose SubSquare API should be searched"),
+        mode: z
+          .enum(["keyword", "full_text"])
+          .default("keyword")
+          .describe("Keyword matches grouped by module (default), or full_text snippets on Polkadot"),
         text: searchText,
         max: searchMax,
-      },
+      }).strict(),
+      outputSchema: z.object({
+        chain: z.string(),
+        query: z.string(),
+        counts: z.record(z.number().int().nonnegative()),
+        source: z.string().url(),
+      }).passthrough(),
       annotations: readOnlyAnnotations,
     },
-    async (args) => createJsonResult(await searchGovernance(args)),
-  );
+    async ({ mode, ...args }) => {
+      if (mode === "full_text" && args.chain !== chains.polkadot) {
+        throw new Error(
+          `[unsupported_chain] Full-text search is not available on ${args.chain}. Hint: use mode=keyword on this chain or select polkadot.`,
+        );
+      }
 
-  server.registerTool(
-    "gov_search_full_text",
-    {
-      description:
-        "Full-text search over Subsquare posts and comments, plus treasury projects and Polkadot Wiki articles, on Polkadot. Returns highlighted snippets and works for free-text phrases rather than exact titles. Only available on Polkadot because the search index is Polkadot-only.",
-      inputSchema: {
-        chain: z
-          .enum([chains.polkadot])
-          .describe("Only Polkadot has the full-text search index"),
-        text: searchText,
-        max: searchMax,
-      },
-      annotations: readOnlyAnnotations,
+      const search = mode === "full_text" ? searchFullText : searchGovernance;
+      return createStructuredJsonResult(await search(args));
     },
-    async (args) => createJsonResult(await searchFullText(args)),
   );
 }

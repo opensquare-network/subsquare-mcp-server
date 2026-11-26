@@ -1,7 +1,8 @@
 import pick from "lodash/pick.js";
-import { chains } from "../config/chain.js";
-import { getChainConfig } from "../config/chains.js";
-import { request } from "./api.js";
+import { chains } from "../../config/chain.js";
+import { getChainConfig } from "../../config/chains.js";
+import { requirePaginatedResponse } from "../../utils/pagination.js";
+import { ApiRequestError, request } from "../api.js";
 
 export const TREASURY_BENEFIT_CHAINS = [chains.polkadot, chains.kusama];
 
@@ -12,6 +13,7 @@ const BENEFIT_MODULE_PATHS = {
   bounties: "bounties",
   child_bounties: "child-bounties",
 };
+export const TREASURY_BENEFIT_MODULES = Object.keys(BENEFIT_MODULE_PATHS);
 
 const BENEFIT_ITEM_FIELDS = [
   "title",
@@ -97,21 +99,16 @@ export async function listTreasuryBeneficiaries({
 } = {}) {
   const { apiUrl, siteUrl } = getChainConfig(chain);
   const endpoint = new URL("treasury/beneficiaries", apiUrl);
-  const response = await request.get(endpoint, {
-    page,
-    page_size: pageSize,
-    sort_by: sortBy,
-  });
-
-  if (!Array.isArray(response?.items)) {
-    throw new Error("SubSquare beneficiaries response did not include items");
-  }
+  const response = requirePaginatedResponse(
+    await request.get(endpoint, { page, page_size: pageSize, sort_by: sortBy }),
+    "SubSquare Treasury beneficiaries",
+  );
 
   return {
     chain,
-    page: response.page ?? page,
-    pageSize: response.pageSize ?? pageSize,
-    total: response.total ?? response.items.length,
+    page: response.page,
+    pageSize: response.pageSize,
+    total: response.total,
     items: response.items.map((item) => ({
       ...compactBeneficiary(item),
       url:
@@ -132,26 +129,22 @@ async function fetchBenefitModule({ chain, address, moduleName, page, pageSize }
   );
 
   try {
-    const response = await request.get(endpoint, {
-      page,
-      page_size: pageSize,
-    });
+    const response = requirePaginatedResponse(
+      await request.get(endpoint, { page, page_size: pageSize }),
+      `SubSquare beneficiary ${moduleName}`,
+    );
 
     return {
       module: moduleName,
       supported: true,
-      page: response?.page ?? page,
-      pageSize: response?.pageSize ?? pageSize,
-      total: response?.total ?? null,
-      items: Array.isArray(response?.items)
-        ? response.items.map((item) =>
-            compactBenefitItem(moduleName, item, siteUrl),
-          )
-        : [],
+      page: response.page,
+      pageSize: response.pageSize,
+      total: response.total,
+      items: response.items.map((item) => compactBenefitItem(moduleName, item, siteUrl)),
       source: endpoint.toString(),
     };
   } catch (error) {
-    if (error?.status !== 404) {
+    if (!(error instanceof ApiRequestError) || error.status !== 404) {
       throw error;
     }
 
@@ -176,12 +169,17 @@ async function fetchBeneficiarySummary({ chain, address }) {
   );
 
   try {
+    const response = await request.get(endpoint);
+    if (typeof response?.address !== "string") {
+      throw new Error("[invalid_upstream_response] SubSquare beneficiary summary did not include an address");
+    }
+
     return {
-      summary: compactBeneficiary(await request.get(endpoint)),
+      summary: compactBeneficiary(response),
       source: endpoint.toString(),
     };
   } catch (error) {
-    if (error?.status !== 404) {
+    if (!(error instanceof ApiRequestError) || error.status !== 404) {
       throw error;
     }
 
@@ -192,14 +190,11 @@ async function fetchBeneficiarySummary({ chain, address }) {
 export async function getAddressTreasuryBenefits({
   chain,
   address,
-  modules,
+  modules = TREASURY_BENEFIT_MODULES,
   page = 1,
   page_size: pageSize = 25,
 } = {}) {
-  const moduleNames =
-    Array.isArray(modules) && modules.length > 0
-      ? [...new Set(modules)]
-      : Object.keys(BENEFIT_MODULE_PATHS);
+  const moduleNames = [...new Set(modules)];
 
   const [summaryResponse, ...moduleResponses] = await Promise.all([
     fetchBeneficiarySummary({ chain, address }),

@@ -1,4 +1,5 @@
 import pick from "lodash/pick.js";
+import { requirePaginatedResponse } from "../../utils/pagination.js";
 import { request } from "../api.js";
 import { createTreasuryUrl } from "./common.js";
 
@@ -28,9 +29,7 @@ export async function getTreasuryBurn({ chain, page, pageSize, includeHistory })
       "SubSquare Treasury burn summary did not include totalBurnt",
     );
   }
-  if (!Array.isArray(response?.items)) {
-    throw new Error("SubSquare Treasury burn response did not include items");
-  }
+  const { items } = requirePaginatedResponse(response, "SubSquare Treasury burn");
   if (includeHistory && !Array.isArray(history)) {
     throw new Error("SubSquare Treasury burn chart response was not an array");
   }
@@ -38,7 +37,7 @@ export async function getTreasuryBurn({ chain, page, pageSize, includeHistory })
   return {
     totalBurnt: summary.totalBurnt,
     ...pick(response, ["total", "page", "pageSize"]),
-    items: response.items.map((item) => ({
+    items: items.map((item) => ({
       ...pick(item, TREASURY_BURN_FIELDS),
       ...pick(item.indexer, ["blockHeight", "blockTime"]),
     })),

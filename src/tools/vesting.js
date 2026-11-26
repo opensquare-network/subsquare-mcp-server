@@ -59,10 +59,8 @@ export function registerVestingTools(server) {
             ),
             locked: amount,
             lockedNow: amount,
-            vested: amount.describe(
-              "Cumulative vested amount, capped at locked; includes amounts already unlocked",
-            ),
-          }),
+            vested: amount,
+          }).passthrough(),
         ),
       },
       annotations: readOnlyAnnotations,
@@ -105,17 +103,10 @@ export function registerVestingTools(server) {
       },
       outputSchema: {
         ...snapshotFields,
-        total: z
-          .number()
-          .int()
-          .nonnegative()
-          .describe("Total accounts matching the address filter"),
+        total: z.number().int().nonnegative(),
         limit: z.number().int().positive(),
-        nextCursor: z
-          .string()
-          .nullable()
-          .describe("Next page cursor; null on the last page"),
-        items: z.array(z.object(accountFields)),
+        nextCursor: z.string().nullable().describe("Null on the last page"),
+        items: z.array(z.object(accountFields).passthrough()),
       },
       annotations: readOnlyAnnotations,
     },

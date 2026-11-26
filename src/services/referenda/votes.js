@@ -1,14 +1,6 @@
-import { chains } from "../../config/chain.js";
-import { getChainConfig } from "../../config/chains.js";
 import { request } from "../api.js";
 import { resolveItemIdentities } from "../identity.js";
-
-const REFERENDUM_PATHS = {
-  opengov: "gov2/referenda",
-  fellowship: "fellowship/referenda",
-};
-
-const VOTE_STATS_CHAINS = [chains.polkadot, chains.kusama, chains.hydration];
+import { getReferendumVoteEndpoints } from "../opengov/paths.js";
 
 const SPLIT_BALANCE_FIELDS = [
   "ayeBalance",
@@ -18,17 +10,11 @@ const SPLIT_BALANCE_FIELDS = [
 const SPLIT_VOTES_FIELDS = ["ayeVotes", "nayVotes", "abstainVotes"];
 
 function toBigInt(value) {
-  try {
-    return BigInt(value ?? 0);
-  } catch {
-    return 0n;
-  }
+  return BigInt(value ?? 0);
 }
 
-function sumValues(items, fields) {
-  return items
-    .flatMap((item) => fields.map((field) => item[field]))
-    .reduce((sum, value) => sum + toBigInt(value), 0n);
+function sumSplitValues(vote, fields) {
+  return fields.reduce((sum, field) => sum + toBigInt(vote[field]), 0n);
 }
 
 function getVoteBalance(vote) {
@@ -36,7 +22,7 @@ function getVoteBalance(vote) {
     return toBigInt(vote.balance);
   }
 
-  return sumValues([vote], SPLIT_BALANCE_FIELDS);
+  return sumSplitValues(vote, SPLIT_BALANCE_FIELDS);
 }
 
 function getVoteWeight(vote) {
@@ -44,7 +30,7 @@ function getVoteWeight(vote) {
     return toBigInt(vote.votes);
   }
 
-  return sumValues([vote], SPLIT_VOTES_FIELDS);
+  return sumSplitValues(vote, SPLIT_VOTES_FIELDS);
 }
 
 function getVoteSide(vote) {
@@ -115,20 +101,8 @@ function createVoteSummary(votes) {
     totalBalance:
       balanceVotes.length === 0
         ? null
-        : (
-            sumValues(balanceVotes, ["balance"]) +
-            sumValues(
-              balanceVotes.filter((vote) => vote.balance == null),
-              SPLIT_BALANCE_FIELDS,
-            )
-          ).toString(),
-    totalVotes: (
-      sumValues(votes, ["votes"]) +
-      sumValues(
-        votes.filter((vote) => vote.votes == null),
-        SPLIT_VOTES_FIELDS,
-      )
-    ).toString(),
+        : balanceVotes.reduce((sum, vote) => sum + getVoteBalance(vote), 0n).toString(),
+    totalVotes: votes.reduce((sum, vote) => sum + getVoteWeight(vote), 0n).toString(),
     convictionCounts,
   };
 }
@@ -149,55 +123,33 @@ function compareVotes(left, right) {
 
 export async function listReferendumVotes({
   chain,
-  referendum_type: referendumType = "opengov",
+  referendum_type: referendumType,
   referendum_index: referendumIndex,
   page = 1,
   page_size: pageSize = 25,
   include_tally_history: includeTallyHistory = false,
   tally_limit: tallyLimit = 50,
 } = {}) {
-  const referendumPath = REFERENDUM_PATHS[referendumType];
-  if (!referendumPath) {
-    throw new Error(`Unsupported referendum type: ${referendumType}`);
-  }
-
-  const { apiUrl } = getChainConfig(chain);
-  const votesUrl = new URL(
-    `${referendumPath}/${encodeURIComponent(referendumIndex)}/votes`,
-    apiUrl,
+  const { votesUrl, statsUrl, tallyHistoryUrl } = getReferendumVoteEndpoints(
+    chain, referendumType, referendumIndex,
   );
 
-  const votesRequest = request.get(votesUrl);
-  const statsRequest =
-    referendumType === "opengov" && VOTE_STATS_CHAINS.includes(chain)
-      ? request
-          .get(
-            new URL(
-              `gov2/referendums/${encodeURIComponent(referendumIndex)}/vote-stats`,
-              apiUrl,
-            ),
-          )
-          .catch(() => null)
-      : Promise.resolve(null);
-  const tallyRequest = includeTallyHistory
-    ? request.get(
-        new URL(
-          `${referendumPath}/${encodeURIComponent(referendumIndex)}/tally-history`,
-          apiUrl,
-        ),
-      )
-    : Promise.resolve(null);
-
   const [votesResponse, statsResponse, tallyResponse] = await Promise.all([
-    votesRequest,
-    statsRequest,
-    tallyRequest,
+    request.get(votesUrl),
+    statsUrl ? request.get(statsUrl) : null,
+    includeTallyHistory ? request.get(tallyHistoryUrl) : null,
   ]);
 
   if (!Array.isArray(votesResponse)) {
     throw new Error(
-      `SubSquare ${referendumType} referendum votes response was not an array`,
+      `[invalid_upstream_response] SubSquare ${referendumType} referendum votes response was not an array`,
     );
+  }
+  if (statsUrl && (!statsResponse || typeof statsResponse !== "object" || Array.isArray(statsResponse))) {
+    throw new Error("[invalid_upstream_response] SubSquare vote statistics response was not an object");
+  }
+  if (includeTallyHistory && !Array.isArray(tallyResponse)) {
+    throw new Error("[invalid_upstream_response] SubSquare tally history response was not an array");
   }
 
   const sortedVotes = [...votesResponse].sort(compareVotes);
@@ -218,7 +170,7 @@ export async function listReferendumVotes({
     pageSize,
     summary: createVoteSummary(sortedVotes),
     stats: stats ? compactVoteStats(stats) : null,
-    tallyHistory: Array.isArray(tallyResponse)
+    tallyHistory: includeTallyHistory
       ? compactTallyHistory(tallyResponse, tallyLimit)
       : null,
     identities,
@@ -248,17 +200,17 @@ function toDecimalString(value) {
   }
 
   if (typeof value === "string" && value.startsWith("0x")) {
-    try {
-      return BigInt(value).toString();
-    } catch {
-      return value;
-    }
+    return BigInt(value).toString();
   }
 
   return String(value);
 }
 
 function toRatioPercent(numerator, denominator) {
+  if (numerator == null || denominator == null) {
+    return null;
+  }
+
   const total = toBigInt(denominator);
   if (total === 0n) {
     return null;
@@ -274,6 +226,7 @@ function compactTallyItem(item) {
   const nays = toDecimalString(tally.nays);
   const support = toDecimalString(tally.support);
   const electorate = toDecimalString(tally.electorate);
+  const votes = ayes == null || nays == null ? null : toBigInt(ayes) + toBigInt(nays);
 
   return {
     blockHeight: item?.indexer?.blockHeight ?? null,
@@ -282,10 +235,9 @@ function compactTallyItem(item) {
     nays,
     support,
     electorate,
-    approvalPercent:
-      toRatioPercent(ayes, toBigInt(ayes) + toBigInt(nays)) ?? null,
+    approvalPercent: toRatioPercent(ayes, votes),
     supportPercent: toRatioPercent(support, electorate),
-    turnoutPercent: toRatioPercent(toBigInt(ayes) + toBigInt(nays), electorate),
+    turnoutPercent: toRatioPercent(votes, electorate),
   };
 }
 

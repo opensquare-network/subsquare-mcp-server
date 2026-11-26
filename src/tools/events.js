@@ -5,7 +5,7 @@ import { createStructuredJsonResult, readOnlyAnnotations } from "./common.js";
 
 const timePoint = (name) =>
   z
-    .union([z.string().trim().min(1), z.number()])
+    .union([z.string().trim().min(1), z.number().int()])
     .describe(
       `${name} as an ISO 8601 datetime (for example 2026-11-01T00:00:00Z) or epoch milliseconds`,
     );
@@ -26,7 +26,7 @@ export function registerEventTools(server) {
     {
       description:
         "List governance events in a time window: treasury, collectives, democracy and OpenGov events such as referendum state changes, bounty and tip activity, with block height and block time. Summary mode returns compact records for digests; detail mode also returns event data and decoded proposal calls. Excludes council, technical committee and tip vote events that Subsquare filters out. Both bounds are inclusive and required.",
-      inputSchema: {
+      inputSchema: z.object({
         chain: z
           .enum(subsquareApiChains)
           .describe("Chain whose SubSquare API should be queried"),
@@ -66,7 +66,7 @@ export function registerEventTools(server) {
           .max(500)
           .default(100)
           .describe("Maximum events to return (default 100, max 500)"),
-      },
+      }).strict(),
       outputSchema: {
         chain: z.string(),
         scope: z.enum(["summary", "detail"]),
@@ -84,7 +84,7 @@ export function registerEventTools(server) {
         total: z.number().int().nonnegative(),
         returned: z.number().int().nonnegative(),
         truncated: z.boolean(),
-        items: z.array(summaryEventSchema.or(z.object({}).passthrough())),
+        items: z.array(summaryEventSchema.passthrough()),
         source: z.string(),
       },
       annotations: readOnlyAnnotations,

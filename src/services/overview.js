@@ -14,8 +14,8 @@ function toCounts(value) {
 
 function createModuleList(payload) {
   const modules = [];
-  for (const [moduleName, value] of Object.entries(payload ?? {})) {
-    if (moduleName === "gov2ReferendaTracks") {
+  for (const [moduleName, value] of Object.entries(payload)) {
+    if (moduleName === "gov2ReferendaTracks" || moduleName === "fellowshipReferendaTracks") {
       continue;
     }
 
@@ -29,11 +29,12 @@ function createModuleList(payload) {
 }
 
 function createTrackList(payload) {
-  if (!Array.isArray(payload?.gov2ReferendaTracks)) {
-    return [];
+  const tracks = payload.gov2ReferendaTracks ?? payload.fellowshipReferendaTracks ?? [];
+  if (!Array.isArray(tracks)) {
+    throw new Error("[invalid_upstream_response] SubSquare overview tracks were not an array");
   }
 
-  return payload.gov2ReferendaTracks.map((track) => ({
+  return tracks.map((track) => ({
     id: track.id ?? track.trackId ?? null,
     name: track.name ?? track.trackName ?? null,
     activeCount: track.activeCount ?? null,
@@ -45,6 +46,9 @@ export async function getGovernanceOverview({ chain, recent = false } = {}) {
   const path = recent ? "overview/recent/summary" : "overview/summary";
   const endpoint = new URL(path, apiUrl);
   const payload = await request.get(endpoint);
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("[invalid_upstream_response] SubSquare overview response was not an object");
+  }
 
   return {
     chain,

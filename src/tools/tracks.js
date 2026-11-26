@@ -1,18 +1,16 @@
 import { z } from "zod";
+import { opengovChains } from "../config/chains.js";
 import {
   getTrackTurnout,
-  listTrackDelegatees,
   listTrackStatistics,
-} from "../../services/referenda/tracks.js";
+} from "../services/opengov/tracks.js";
 import {
   createStructuredJsonResult,
-  page,
-  pageSize,
   readOnlyAnnotations,
-} from "../common.js";
+} from "./common.js";
 
 const opengovChain = z
-  .enum(["polkadot", "kusama", "hydration"])
+  .enum(opengovChains)
   .describe("OpenGov chain whose SubSquare API should be queried");
 
 const trackId = z
@@ -51,13 +49,13 @@ const turnoutItemSchema = z.object({
   delegationCapital: z.string().nullable(),
 });
 
-export function registerReferendaTrackTools(server) {
+export function registerOpenGovTrackTools(server) {
   server.registerTool(
     "opengov_list_track_statistics",
     {
       description:
         "List OpenGov tracks with the Subsquare track turnout summary (ratio of supporting capital to electorate), referenda counts, and delegation statistics (delegators, delegatees, delegated capital and votes). Use it to compare governance activity and delegation across tracks. Amounts use chain base units.",
-      inputSchema: { chain: opengovChain },
+      inputSchema: z.object({ chain: opengovChain }).strict(),
       outputSchema: {
         chain: z.string(),
         totalReferendaCount: z.number().nullable(),
@@ -82,7 +80,7 @@ export function registerReferendaTrackTools(server) {
     {
       description:
         "Get the per-referendum turnout series for one OpenGov track: votes, ayes, nays, support, electorate, direct and delegated addresses and capital, plus computed turnout and approval percentages. Returns the most recent records in chronological order when the series is trimmed by limit.",
-      inputSchema: {
+      inputSchema: z.object({
         chain: opengovChain,
         track_id: trackId,
         limit: z
@@ -94,7 +92,7 @@ export function registerReferendaTrackTools(server) {
           .describe(
             "Number of most recent referenda in the series to return (default 20)",
           ),
-      },
+      }).strict(),
       outputSchema: {
         chain: z.string(),
         trackId: z.number().int().nonnegative(),
@@ -107,44 +105,4 @@ export function registerReferendaTrackTools(server) {
     async (args) => createStructuredJsonResult(await getTrackTurnout(args)),
   );
 
-  server.registerTool(
-    "opengov_list_track_delegatees",
-    {
-      description:
-        "List delegatees of one OpenGov track with their delegator counts, delegated capital and delegated voting power. Sortable by delegated votes, delegated capital, or delegator count.",
-      inputSchema: {
-        chain: opengovChain,
-        track_id: trackId,
-        page,
-        page_size: pageSize,
-        sort_by: z
-          .enum(["delegatedVotes", "delegatedCapital", "delegatorsCount"])
-          .default("delegatedVotes")
-          .describe("Field to sort by (default delegatedVotes)"),
-        sort_order: z
-          .enum(["asc", "desc"])
-          .default("desc")
-          .describe("Sort direction (default desc)"),
-      },
-      outputSchema: {
-        chain: z.string(),
-        trackId: z.number().int().nonnegative(),
-        page: z.number().int().positive(),
-        pageSize: z.number().int().positive(),
-        total: z.number().int().nonnegative(),
-        items: z.array(
-          z.object({
-            account: z.string().nullable(),
-            trackId: z.number().nullable(),
-            delegatorsCount: z.number().nullable(),
-            delegatedCapital: z.string().nullable(),
-            delegatedVotes: z.string().nullable(),
-          }),
-        ),
-        source: z.string(),
-      },
-      annotations: readOnlyAnnotations,
-    },
-    async (args) => createStructuredJsonResult(await listTrackDelegatees(args)),
-  );
 }

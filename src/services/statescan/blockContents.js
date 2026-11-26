@@ -1,6 +1,12 @@
 import { getStateScanConfig } from "../../config/chains.js";
+import {
+  requirePaginatedResponse,
+  zeroBasedPaginatedItemsSchema,
+} from "../../utils/pagination.js";
 import { request } from "../api.js";
 import { resolveItemIdentities } from "../identity.js";
+
+export const blockContentsPageSchema = zeroBasedPaginatedItemsSchema.partial({ total: true });
 
 const filterNames = [
   "section",
@@ -38,7 +44,7 @@ async function listBlockContents(args, path) {
   for (const name of filterNames) query[name] = args[name];
 
   const result = await request.get(new URL(path, apiUrl), query);
-  const items = result?.items ?? [];
+  const { items } = requirePaginatedResponse(result, `StateScan ${path}`, blockContentsPageSchema);
   const identities = await resolveItemIdentities(chain, items);
 
   return {

@@ -2,8 +2,6 @@ import pick from "lodash/pick.js";
 import { getChainConfig } from "../config/chains.js";
 import { request } from "./api.js";
 
-const DEFAULT_MAX = 10;
-const MAX_LIMIT = 50;
 const FULL_TEXT_CONTENT_LIMIT = 400;
 
 const ITEM_FIELDS = [
@@ -83,14 +81,6 @@ const FULL_TEXT_URL_PATHS = {
   treasurySpend: (item) =>
     item.index == null ? null : `treasury/spends/${item.index}`,
 };
-
-function normalizeMax(max) {
-  if (!Number.isInteger(max) || max < 1) {
-    return DEFAULT_MAX;
-  }
-
-  return Math.min(max, MAX_LIMIT);
-}
 
 function createGroupUrl(groupName, item, siteUrl) {
   if (groupName === "childBounties") {
@@ -178,19 +168,21 @@ function compactWikiItem(item) {
 export async function searchGovernance({ chain, text, max } = {}) {
   const { apiUrl, siteUrl } = getChainConfig(chain);
   const endpoint = new URL("search", apiUrl);
-  const response = await request.get(endpoint, { text, max: normalizeMax(max) });
+  const response = await request.get(endpoint, { text, max });
 
-  const results = {};
-  for (const [groupName, items] of Object.entries(response ?? {})) {
-    if (!Array.isArray(items) || items.length === 0) {
-      continue;
-    }
-
-    results[groupName] = items.map((item) =>
-      compactSearchItem(groupName, item, siteUrl),
-    );
+  if (!response || typeof response !== "object" || Array.isArray(response)
+    || !Object.values(response).every(Array.isArray)) {
+    throw new Error("[invalid_upstream_response] SubSquare keyword search did not return groups of results");
   }
 
+  const results = Object.fromEntries(
+    Object.entries(response)
+      .filter(([, items]) => items.length > 0)
+      .map(([groupName, items]) => [
+        groupName,
+        items.map((item) => compactSearchItem(groupName, item, siteUrl)),
+      ]),
+  );
   const counts = Object.fromEntries(
     Object.entries(results).map(([groupName, items]) => [
       groupName,
@@ -211,17 +203,19 @@ export async function searchGovernance({ chain, text, max } = {}) {
 export async function searchFullText({ chain, text, max } = {}) {
   const { apiUrl, siteUrl } = getChainConfig(chain);
   const endpoint = new URL("search/full-text", apiUrl);
-  const response = await request.get(endpoint, { text, max: normalizeMax(max) });
+  const response = await request.get(endpoint, { text, max });
 
-  const items = Array.isArray(response?.items)
-    ? response.items.map((item) => compactFullTextItem(item, siteUrl))
-    : [];
-  const projects = Array.isArray(response?.projects)
-    ? response.projects.map((item) => compactSearchItem("projects", item, siteUrl))
-    : [];
-  const wiki = Array.isArray(response?.wiki)
-    ? response.wiki.map(compactWikiItem)
-    : [];
+  for (const field of ["items", "projects", "wiki"]) {
+    if (!Array.isArray(response?.[field])) {
+      throw new Error(
+        `[invalid_upstream_response] SubSquare full-text search did not return a ${field} array`,
+      );
+    }
+  }
+
+  const items = response.items.map((item) => compactFullTextItem(item, siteUrl));
+  const projects = response.projects.map((item) => compactSearchItem("projects", item, siteUrl));
+  const wiki = response.wiki.map(compactWikiItem);
 
   return {
     chain,

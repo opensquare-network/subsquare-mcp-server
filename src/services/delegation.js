@@ -1,5 +1,6 @@
 import { LRUCache } from "lru-cache";
 import { getChainConfig } from "../config/chains.js";
+import { requirePaginatedResponse } from "../utils/pagination.js";
 import { request } from "./api.js";
 import { resolveItemIdentities } from "./identity.js";
 
@@ -122,5 +123,41 @@ export async function listDelegations({ chain, track_id: trackId, ...query }) {
     ...result,
     items,
     identities,
+  };
+}
+
+export async function listTrackDelegatees({
+  chain,
+  track_id: trackId,
+  page = 1,
+  page_size: pageSize = 25,
+  sort_by: sortBy = "delegatedVotes",
+  sort_order: sortOrder = "desc",
+}) {
+  const { apiUrl } = getChainConfig(chain);
+  const endpoint = new URL(`referenda/tracks/${trackId}/delegatee`, apiUrl);
+  const response = requirePaginatedResponse(
+    await request.get(endpoint, {
+      page,
+      page_size: pageSize,
+      sort: JSON.stringify([sortBy, sortOrder]),
+    }),
+    "SubSquare track delegatees",
+  );
+
+  return {
+    chain,
+    trackId,
+    page: response.page,
+    pageSize: response.pageSize,
+    total: response.total,
+    items: response.items.map((item) => ({
+      account: item.account ?? null,
+      trackId: item.trackId ?? null,
+      delegatorsCount: item.delegatorsCount ?? null,
+      delegatedCapital: item.delegatedCapital ?? null,
+      delegatedVotes: item.delegatedVotes ?? null,
+    })),
+    source: endpoint.toString(),
   };
 }

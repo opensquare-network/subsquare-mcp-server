@@ -1,29 +1,18 @@
 import { getChainConfig } from "../config/chains.js";
 import { request } from "./api.js";
 
-const DEFAULT_LIMIT = 100;
-const MAX_LIMIT = 500;
-
 function toTimestamp(value, fieldName) {
   const trimmed = String(value ?? "").trim();
   const numeric = /^-?\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN;
   const parsed = Number.isFinite(numeric) ? numeric : Date.parse(trimmed);
 
-  if (!Number.isFinite(parsed)) {
+  if (!Number.isFinite(new Date(parsed).getTime())) {
     throw new Error(
-      `${fieldName} must be an ISO 8601 datetime or epoch milliseconds`,
+      `[invalid_time] ${fieldName} must be a valid ISO 8601 datetime or epoch milliseconds`,
     );
   }
 
   return parsed;
-}
-
-function normalizeLimit(limit) {
-  if (!Number.isInteger(limit) || limit < 1) {
-    return DEFAULT_LIMIT;
-  }
-
-  return Math.min(limit, MAX_LIMIT);
 }
 
 function compactSummaryEvent(item) {
@@ -65,13 +54,13 @@ export async function listGovernanceEvents({
   category,
   sub_category: subCategory,
   type,
-  limit,
+  limit = 100,
 } = {}) {
   const beginTimestamp = toTimestamp(beginTime, "begin_time");
   const endTimestamp = toTimestamp(endTime, "end_time");
 
-  if (endTimestamp <= beginTimestamp) {
-    throw new Error("end_time must be later than begin_time");
+  if (endTimestamp < beginTimestamp) {
+    throw new Error("[invalid_time_window] end_time must be at or after begin_time");
   }
 
   const { apiUrl } = getChainConfig(chain);
@@ -83,7 +72,7 @@ export async function listGovernanceEvents({
   });
 
   if (!Array.isArray(response)) {
-    throw new Error("SubSquare events response was not an array");
+    throw new Error("[invalid_upstream_response] SubSquare events response was not an array");
   }
 
   const filtered = response
@@ -99,9 +88,8 @@ export async function listGovernanceEvents({
         (left.indexer?.blockTime ?? 0) - (right.indexer?.blockTime ?? 0),
     );
 
-  const maxItems = normalizeLimit(limit);
   const items = filtered
-    .slice(0, maxItems)
+    .slice(0, limit)
     .map((item) => (summary ? compactSummaryEvent(item) : compactEvent(item)));
 
   return {
