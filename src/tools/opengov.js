@@ -4,7 +4,6 @@ import {
   getReferendaSummary,
   getReferendum,
   listReferenda,
-  listTracks,
 } from "../services/opengov/index.js";
 import {
   createStructuredJsonResult,
@@ -14,6 +13,7 @@ import {
   readOnlyAnnotations,
   simple,
 } from "./common.js";
+import { registerOpenGovTrackTools } from "./tracks.js";
 
 const chain = z
   .enum(subsquareApiChains)
@@ -114,49 +114,24 @@ export function registerOpengovTools(server) {
     "opengov_referendum_detail",
     {
       description:
-        "Get the full details of one OpenGov referendum by its index.",
-      inputSchema: {
+        "Get the full details of one OpenGov referendum by its index. Set resolve_preimage to include the proposal's stored preimage, with decoded calls when available. Preimage is null if there is no proposal hash or the hash is not indexed.",
+      inputSchema: z.object({
         chain,
         referendum_index: z
           .number()
           .int()
           .nonnegative()
           .describe("The exact governance referendum index"),
-      },
+        resolve_preimage: z
+          .boolean()
+          .default(false)
+          .describe("Fetch the stored proposal preimage (default false)"),
+      }).strict(),
       outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
     async (args) => createStructuredJsonResult(await getReferendum(args)),
   );
 
-  server.registerTool(
-    "opengov_list_tracks",
-    {
-      description:
-        "List governance track IDs, names, active referendum counts, and SubSquare detail URLs. On collectives, returns Fellowship tracks.",
-      inputSchema: { chain },
-      outputSchema: {
-        tracks: z.array(
-          z.object({
-            id: z.number().int().nonnegative().describe("Governance track ID"),
-            name: z.string().describe("Governance track name"),
-            activeCount: z
-              .number()
-              .int()
-              .nonnegative()
-              .nullable()
-              .describe(
-                "Number of active referenda on this track, or null when unavailable",
-              ),
-            url: z
-              .string()
-              .url()
-              .describe("SubSquare page for this governance track"),
-          }),
-        ),
-      },
-      annotations: readOnlyAnnotations,
-    },
-    async (args) => createStructuredJsonResult(await listTracks(args)),
-  );
+  registerOpenGovTrackTools(server);
 }

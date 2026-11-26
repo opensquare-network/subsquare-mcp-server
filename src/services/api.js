@@ -6,8 +6,8 @@ const API_REQUEST_TIMEOUT_MS = 10_000;
 const dispatcher = new EnvHttpProxyAgent();
 
 export class ApiRequestError extends Error {
-  constructor(message, { status = null, path = null } = {}) {
-    super(message);
+  constructor(message, { status = null, path = null, cause } = {}) {
+    super(message, { cause });
     this.name = "ApiRequestError";
     this.status = status;
     this.path = path;
@@ -42,14 +42,23 @@ async function requestJson(url, { method = "GET", query = {}, body } = {}) {
     requestOptions.body = JSON.stringify(body);
   }
 
-  const response = await fetch(requestUrl, requestOptions);
-
-  if (response.ok) {
-    return response.json();
+  let response;
+  let text;
+  try {
+    response = await fetch(requestUrl, requestOptions);
+    text = await response.text();
+  } catch (error) {
+    throw new ApiRequestError(
+      `API request transport failed: ${error.cause?.message ?? error.message}`,
+      { path: requestUrl.pathname, cause: error },
+    );
   }
 
-  const message =
-    (await response.text()).trim() || response.statusText || "Unknown error";
+  if (response.ok) {
+    return JSON.parse(text);
+  }
+
+  const message = text.trim() || response.statusText || "Unknown error";
   throw new ApiRequestError(
     `API request failed with status ${response.status}: ${message}`,
     {

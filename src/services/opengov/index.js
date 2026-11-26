@@ -2,6 +2,7 @@ import { LRUCache } from "lru-cache";
 import { isCollectivesChain } from "../../config/chain.js";
 import { getChainConfig, subsquareApiChains } from "../../config/chains.js";
 import { request } from "../api.js";
+import { getPreimage } from "../preimage.js";
 import {
   FELLOWSHIP_TRACK_PATHS,
   OPENGOV_TRACK_PATHS,
@@ -97,9 +98,20 @@ export async function listReferenda({
   };
 }
 
-export async function getReferendum({ chain, referendum_index } = {}) {
+export async function getReferendum({
+  chain,
+  referendum_index: referendumIndex,
+  resolve_preimage: resolvePreimage = false,
+} = {}) {
   const { detailUrl } = getReferendaEndpoints(chain);
-  return request.get(detailUrl(referendum_index));
+  const referendum = await request.get(detailUrl(referendumIndex));
+  if (!resolvePreimage) {
+    return referendum;
+  }
+
+  const hash = referendum.onchainData?.proposalHash;
+  const preimage = hash ? (await getPreimage({ chain, hash })).preimage : null;
+  return { ...referendum, preimage };
 }
 
 export async function listTracks({ chain } = {}) {

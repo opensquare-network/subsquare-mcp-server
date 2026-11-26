@@ -25,6 +25,20 @@ export function getReferendaEndpoints(chain) {
   };
 }
 
+export function getReferendumVoteEndpoints(chain, type, referendumIndex) {
+  const { apiUrl, referendaPath } = getChainConfig(chain);
+  const path = type === "opengov" ? "gov2/referenda" : "fellowship/referenda";
+  const index = encodeURIComponent(referendumIndex);
+
+  return {
+    votesUrl: new URL(`${path}/${index}/votes`, apiUrl),
+    tallyHistoryUrl: new URL(`${path}/${index}/tally-history`, apiUrl),
+    statsUrl: type === "opengov"
+      ? new URL(`${referendaPath}/${index}/vote-stats`, apiUrl)
+      : null,
+  };
+}
+
 export const OPENGOV_TRACK_PATHS = {
   summary: "gov2/tracks/summary",
   detail: "referenda/tracks/",

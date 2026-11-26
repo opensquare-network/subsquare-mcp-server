@@ -53,6 +53,7 @@ const chainApiEndpoints = {
 };
 
 export const subsquareApiChains = Object.keys(chainApiEndpoints);
+export const opengovChains = [chains.polkadot, chains.kusama, chains.hydration];
 
 const chainSiteEndpoints = {
   [chains.polkadot]: "https://polkadot.subsquare.io",
@@ -126,15 +127,6 @@ export const getCoretimeGraphqlUrl = getEndpointByChain(
 const getSiteUrlByChain = getEndpointByChain(chainSiteEndpoints);
 const getStateScanApiUrlByChain = getEndpointByChain(stateScanApiEndpoints);
 
-function requireEnv(name) {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`${name} is not configured`);
-  }
-
-  return value;
-}
-
 export function getChainConfig(chain) {
   return {
     apiUrl: getApiUrlByChain(chain),
@@ -156,14 +148,23 @@ export function getStateScanConfig(chain) {
   };
 }
 
+export class IdentityConfigError extends Error {}
+
 export function getIdentityConfig(chain) {
   const identityChain = identityChains[chain];
   if (!identityChain) {
     throw new Error(`${chain} does not support identity queries`);
   }
 
-  return {
-    apiUrl: requireEnv("SUBSQUARE_IDENTITY_SERVER_URL"),
-    identityChain,
-  };
+  const name = "SUBSQUARE_IDENTITY_SERVER_URL";
+  const apiUrl = process.env[name]?.trim();
+  if (!apiUrl) {
+    throw new IdentityConfigError(`${name} is not configured`);
+  }
+  const url = URL.parse(apiUrl);
+  if (!url || !["http:", "https:"].includes(url.protocol)) {
+    throw new IdentityConfigError(`${name} must be a valid HTTP(S) URL`);
+  }
+
+  return { apiUrl, identityChain };
 }

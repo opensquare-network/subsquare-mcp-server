@@ -1,7 +1,7 @@
 # MCP Tools
 
-The server exposes **38 read-only tools**. Related records are often grouped in one tool
-and selected with an enum argument (`kind`, `view`, `bounty_type`, or `referendum_type`).
+The server exposes **45 read-only tools**. Related records are often grouped in one tool
+and selected with an enum argument (`kind`, `view`, `mode`, `bounty_type`, or `referendum_type`).
 Dedicated statistics tools do not load the related lists, profiles, or details.
 
 Conventions:
@@ -9,25 +9,36 @@ Conventions:
 - All tools are read-only. Most paginated lists take `page` / `page_size` starting at page 1.
   `block_list` and account extrinsics/transfers start at page 0. Account assets and Coretime
   list queries take `limit` / `offset`; Vesting accounts take `limit` / `cursor`.
-- Paginated Treasury, bounty, Fellowship feed/application, and StateScan queries return
-  an error for incomplete upstream pages. A valid page can be empty, and StateScan block
-  lists do not require a `total`.
+- Paginated Treasury, bounty, track delegatee, Fellowship feed/application, and StateScan
+  queries return an error for incomplete upstream pages. A valid page can be empty, and
+  StateScan block lists do not require a `total`.
 - `chain` accepts only the chains listed for the tool; unsupported combinations fail fast
   with an actionable error.
 - Arguments that do not apply to the selected record type are rejected with an actionable
   error instead of being silently ignored.
 - JSON payloads are returned in `structuredContent` and mirrored as text in `content`.
 
-## OpenGov
+## Discovery and Overview
+
+| Tool | Enum | Description | Chains |
+| --- | --- | --- | --- |
+| `gov_search` | `mode` = `keyword` \| `full_text` | Match keywords across governance modules (default), or search posts and comments with highlighted snippets. Text must have at least three characters unless it is a numeric ID such as `42`. Results include detail links or comment permalinks where available; Treasury tip links require both a block height and a hash. Projects include an `id` for `treasury_get_project_detail`; Wiki matches include their location and an excerpt. | Keyword: Polkadot, Kusama, Hydration, Polkadot Collectives. Full text: Polkadot |
+| `gov_overview` | — | Get active and total counts by module, and active counts by track. Includes both OpenGov and Fellowship tracks where available, distinguished by `referendumType`. Set `recent: true` for active or recently updated records. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `list_gov_events` | — | List governance events between inclusive `begin_time` and `end_time` bounds, with category, sub-category, and type filters (e.g. `referenda_confirmed`). Set `summary: false` to include details such as the referendum index, Treasury `spendIndex`, or Treasury tip hash. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+
+## OpenGov and Referenda
 
 | Tool | Enum | Description | Chains |
 | --- | --- | --- | --- |
 | `opengov_list_referenda` | — | List and filter referenda, or use `proposer` to list one user's referenda (not on Collectives). Set `include_summary: true` for chain-wide state counts, cached for one minute. `summaryStatus` is `available`, `not_requested`, or `unavailable`. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `opengov_referenda_summary` | — | Get chain-wide state counts without fetching a referendum list. Shares the one-minute cache with `opengov_list_referenda`. On Collectives, returns Fellowship counts. | Polkadot, Kusama, Hydration, Polkadot Collectives |
-| `opengov_referendum_detail` | — | Get one referendum's full details. | Polkadot, Kusama, Hydration, Polkadot Collectives |
-| `opengov_list_tracks` | — | List track IDs, names, active referendum counts, and detail URLs. Collectives returns Fellowship tracks. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `opengov_referendum_detail` | — | Get one referendum's full details. Set `resolve_preimage: true` to also look up the stored proposal preimage. Malformed preimage records are errors, not missing preimages. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `get_preimage` | — | Look up a stored preimage by its 0x-prefixed hash. A match must contain a decoded call (including nested batched calls when available) or raw bytes. Hexadecimal digits are case-insensitive; the returned lookup hash is lowercase. `found` is false when the upstream returns 404; malformed records return an error. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `opengov_list_tracks` | `view` = `summary` \| `statistics` | `summary` (default) lists IDs, names, active counts, and detail URLs; Collectives returns Fellowship tracks. `statistics` compares OpenGov tracks by turnout, referendum counts, and delegation. Delegated capital and votes are decimal strings, including `"0"`, or `null` when unavailable. Both views return their records in `tracks`. | Summary: Polkadot, Kusama, Hydration, Polkadot Collectives. Statistics: Polkadot, Kusama, Hydration |
+| `opengov_get_track_turnout` | — | Get one track's per-referendum turnout series with turnout and approval percentages. | Polkadot, Kusama, Hydration |
+| `list_referendum_votes` | `referendum_type` = `opengov` \| `fellowship` | List votes with a referendum-wide summary, including conviction counts for all vote records. `identityStatus` is `available` after a successful identity lookup, `not_applicable` when the page has no addresses to resolve, or `unavailable` on lookup failure (votes and stats are still returned with empty `identities`). OpenGov `stats` include `totalCapital` and the indexed turnout as `turnoutRatio` and `turnoutPercent`; set `include_stats: false` to skip the lookup. `statsStatus` is `available`, `not_requested`, `unavailable`, or `unsupported` (Fellowship). An empty stats object or an HTTP/transport failure in the stats lookup leaves votes available with `statsStatus: "unavailable"`; malformed nonempty responses return an error. Set `include_tally_history: true` to include the tally series. Historical support uses recorded issuance for OpenGov and bare ayes divided by the maximum eligible voters for Fellowship. Historical turnout is null without voting capital. `tally_limit` only applies to the series. | OpenGov: Polkadot, Kusama, Hydration. Fellowship: Kusama, Polkadot Collectives |
 | `list_referendum_comments` | `referendum_type` = `opengov` \| `fellowship` \| `ambassador` | List referendum comments with reactions and nested replies. Use `page_size` and `include_polkassembly` (set to `false` to exclude Polkassembly comments); legacy `pageSize` and `includePolkassembly` are rejected. | OpenGov: Polkadot, Kusama, Hydration. Fellowship: Polkadot Collectives, Kusama. Ambassador: Polkadot Collectives |
-| `opengov_list_delegations` | `view` = `delegates` \| `delegators` \| `track` | List delegates with statistics, one delegate's delegators (`address`), or delegation relationships for one `track_id`. `page_size` defaults to 100 for `delegators`, 25 for the other views. | Polkadot, Kusama, Hydration |
+| `opengov_list_delegations` | `view` = `delegates` \| `delegators` \| `track` \| `track_delegatees` | List delegates with statistics, one delegate's delegators (`address`), delegation relationships for one `track_id`, or ranked delegatees for one `track_id`. `sort_by` and `sort_order` apply only to `track_delegatees`. `page_size` defaults to 100 for `delegators`, 25 otherwise. | Polkadot, Kusama, Hydration |
 
 ## Democracy, Council, and Technical Committee
 
@@ -41,7 +52,8 @@ Conventions:
 
 | Tool | Enum | Description | Chains |
 | --- | --- | --- | --- |
-| `treasury_list` | `kind` = `projects` \| `tips` \| `proposals` \| `spends` | Return compact project metadata (unpaginated) or paginated tips, proposals, or spends. Use `treasury_get_project_detail` for a project's linked funding records. | Projects: Polkadot. Tips, proposals, spends: Polkadot, Kusama, Hydration |
+| `treasury_list` | `kind` = `projects` \| `tips` \| `proposals` \| `spends` \| `beneficiaries` | Return all projects or paginated tips, proposals, spends, or beneficiaries. Beneficiary counts include unpaid records. Use `sort_by` to rank paid or awarded amounts by estimated USD at submission (`total_value`) or at finalization when available (`awarded_value`). Use `treasury_get_project_detail` for a project's linked funding records. | Projects: Polkadot. Beneficiaries: Polkadot, Kusama. Tips, proposals, spends: Polkadot, Kusama, Hydration |
+| `get_address_treasury_benefits` | — | Get paginated records naming an address as beneficiary for all or selected Treasury modules. The 32-byte SS58 address is normalized to the selected chain's prefix before every lookup. Counts and record lists include unpaid records; the estimated USD totals cover only paid or awarded records. A module returning HTTP 404 is marked `supported: false` with an `error` and null page fields, not an empty page. | Polkadot, Kusama |
 | `treasury_get` | `view` = `status` \| `burn` | Summarize Treasury activity counts, or get cumulative burns with paginated records and optional history. Pagination and `include_history` apply only to `view=burn`. | Polkadot, Kusama, Hydration |
 | `treasury_get_balances` | — | Get Treasury balances reported by DotTreasury for one chain or every reported chain. | Polkadot, Kusama, Hydration, Acala, Karura, Bifrost, Astar |
 | `treasury_get_project_detail` | — | Get one Polkadot Treasury project with its linked proposals, spends, tips, bounties, and child bounties. | Polkadot |
@@ -95,3 +107,14 @@ Conventions:
 | `list_vesting_accounts` | List accounts with Vesting schedules, ranked globally by unlockable amount by default. | Polkadot Asset Hub, Kusama Asset Hub |
 | `list_coretime_sales` | List Coretime sale cycles with compact records. Invalid list responses are rejected: `total` must be a nonnegative integer and `items` must be an array. | Polkadot, Kusama |
 | `get_coretime_sale` | Get a Coretime sale overview with optional purchases, renewals, and timeline. | Polkadot, Kusama |
+
+## Migrating added tools
+
+| Previous tool | Replacement |
+| --- | --- |
+| `gov_search_full_text` | `gov_search` with `mode=full_text` |
+| `opengov_list_referendum_votes` | `list_referendum_votes` with `referendum_type=opengov` |
+| `fellowship_list_referendum_votes` | `list_referendum_votes` with `referendum_type=fellowship` |
+| `opengov_list_track_delegatees` | `opengov_list_delegations` with `view=track_delegatees` |
+| `opengov_list_track_statistics` | `opengov_list_tracks` with `view=statistics` |
+| `treasury_list_beneficiaries` | `treasury_list` with `kind=beneficiaries` |

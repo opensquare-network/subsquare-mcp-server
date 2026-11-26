@@ -5,6 +5,10 @@ import {
   getTreasuryBalances,
 } from "../../services/dotreasury.js";
 import {
+  listTreasuryBeneficiaries,
+  TREASURY_BENEFIT_CHAINS,
+} from "../../services/treasury/beneficiaries.js";
+import {
   getTreasuryBurn,
   getTreasuryStatus,
   listTreasuryProjects,
@@ -20,6 +24,7 @@ import {
   readOnlyAnnotations,
   rejectUnsupportedArguments,
 } from "../common.js";
+import { registerTreasuryBeneficiaryTools } from "./beneficiaries.js";
 import {
   registerTreasuryProjectTools,
   treasuryProjectSummarySchema,
@@ -29,7 +34,7 @@ const treasuryChain = z
   .enum(treasuryChains)
   .describe("Treasury chain to query: polkadot, kusama, or hydration");
 
-const TREASURY_LIST_KINDS = ["projects", "tips", "proposals", "spends"];
+const TREASURY_LIST_KINDS = ["projects", "tips", "proposals", "spends", "beneficiaries"];
 const TREASURY_GET_VIEWS = ["status", "burn"];
 
 export function registerTreasuryTools(server) {
@@ -37,14 +42,20 @@ export function registerTreasuryTools(server) {
     "treasury_list",
     {
       description:
-        "List Treasury records on a chain. kind=projects lists compact Polkadot project metadata without pagination; use treasury_get_project_detail for linked funding records. Tips, proposals, and spends are paginated and include compact records with detail URLs.",
+        "List Treasury records on a chain. kind=projects lists Polkadot project metadata without pagination; use treasury_get_project_detail for linked funding records. Tips, proposals, spends, and beneficiaries are paginated. On Polkadot and Kusama, beneficiaries are ranked by estimated USD of paid or awarded records. Beneficiary record counts include unpaid records.",
       inputSchema: z
         .object({
           chain: treasuryChain,
           kind: z
             .enum(TREASURY_LIST_KINDS)
-            .describe("Record set to list: projects, tips, proposals, or spends"),
+            .describe("Record set to list"),
           ...optionalPaginationInputShape,
+          sort_by: z
+            .enum(["total_value", "awarded_value"])
+            .optional()
+            .describe(
+              "Only for beneficiaries: rank paid or awarded amounts by estimated USD at submission (total_value, default) or at finalization when available (awarded_value)",
+            ),
         })
         .strict(),
       outputSchema: paginatedItemsSchema
@@ -53,7 +64,19 @@ export function registerTreasuryTools(server) {
         .passthrough(),
       annotations: readOnlyAnnotations,
     },
-    async ({ chain, kind, page: pageValue, page_size: pageSizeValue }) => {
+    async ({ chain, kind, page: pageValue, page_size: pageSizeValue, sort_by }) => {
+      if (kind !== "beneficiaries") {
+        rejectUnsupportedArguments(
+          `kind=${kind}`,
+          { sort_by },
+          "Use sort_by only for kind=beneficiaries.",
+        );
+      } else if (!TREASURY_BENEFIT_CHAINS.includes(chain)) {
+        throw new Error(
+          `[unsupported_chain] Treasury beneficiaries are not available on ${chain}. Hint: use polkadot or kusama.`,
+        );
+      }
+
       if (kind === "projects") {
         if (chain !== "polkadot") {
           throw new Error(
@@ -74,6 +97,7 @@ export function registerTreasuryTools(server) {
         tips: listTreasuryTips,
         proposals: listTreasuryProposals,
         spends: listTreasurySpends,
+        beneficiaries: listTreasuryBeneficiaries,
       };
 
       return createStructuredJsonResult(
@@ -81,6 +105,7 @@ export function registerTreasuryTools(server) {
           chain,
           page: pageValue ?? 1,
           page_size: pageSizeValue ?? 25,
+          ...(kind === "beneficiaries" ? { sort_by } : {}),
         }),
       );
     },
@@ -182,4 +207,5 @@ export function registerTreasuryTools(server) {
   );
 
   registerTreasuryProjectTools(server);
+  registerTreasuryBeneficiaryTools(server);
 }
