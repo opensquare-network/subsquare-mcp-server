@@ -874,19 +874,20 @@ test("empty vote and tally pages distinguish missing capital from zero votes", a
 });
 
 test("scientific notation vote amounts are parsed exactly for sorting and totals", async (t) => {
+  let votes = [
+    {
+      account: "delegating", isDelegating: true, aye: true, conviction: 1,
+      balance: "1.2E+21", votes: "1.2E+21",
+    },
+    {
+      account: "split", isSplit: true, conviction: 0,
+      ayeBalance: "6E+20", ayeVotes: "6E+20", nayBalance: "6E+20", nayVotes: "6E+20",
+    },
+    { account: "standard", aye: false, conviction: 0, balance: "5", votes: "5" },
+  ];
   t.mock.method(request, "get", async (url) => {
     if (url.pathname === "/gov2/referenda/0/votes") {
-      return [
-        {
-          account: "delegating", isDelegating: true, aye: true, conviction: 1,
-          balance: "1.2E+21", votes: "1.2E+21",
-        },
-        {
-          account: "split", isSplit: true, conviction: 0,
-          ayeBalance: "6E+20", ayeVotes: "6E+20", nayBalance: "6E+20", nayVotes: "6E+20",
-        },
-        { account: "standard", aye: false, conviction: 0, balance: "5", votes: "5" },
-      ];
+      return votes;
     }
     assert.equal(url.pathname, "/gov2/referendums/0/vote-stats");
     return {};
@@ -902,6 +903,15 @@ test("scientific notation vote amounts are parsed exactly for sorting and totals
   );
   assert.equal(result.summary.totalBalance, "2400000000000000000005");
   assert.equal(result.summary.totalVotes, "2400000000000000000005");
+
+  votes = [
+    { account: "fractional", aye: true, conviction: 0, balance: "0.6", votes: "0.6" },
+    { account: "fractional2", aye: true, conviction: 0, balance: "0.6", votes: "0.6" },
+  ];
+  await expectToolError(
+    client, "list_referendum_votes", { chain: "polkadot", referendum_type: "opengov", referendum_index: 0 },
+    /\[invalid_upstream_response\].*integers/,
+  );
 });
 
 test("identity lookup failures do not discard referendum votes or indexed stats", async (t) => {
@@ -1441,6 +1451,9 @@ test("governance event windows are inclusive and invalid timestamps fail before 
     "2025-02-29T00:00:00Z",
     "2025-04-31T00:00:00Z",
     "2025-13-01T00:00:00Z",
+    "2025-03-01T24:01:00Z",
+    "2025-03-01T24:00:01Z",
+    "2025-03-01T24:00:00.500Z",
     "March 5, 2025",
   ]) {
     await expectToolError(
@@ -1454,6 +1467,24 @@ test("governance event windows are inclusive and invalid timestamps fail before 
   const events = await call(client, "list_gov_events", args);
   assert.deepEqual(events.items.map(({ blockTime }) => blockTime), [time]);
   assert.equal(events.truncated, false);
+});
+
+test("end-of-day 24:00 timestamps roll over to the next day", async (t) => {
+  const begin = Date.parse("2025-03-01T00:00:00Z");
+  const endOfDay = Date.parse("2025-03-02T00:00:00Z");
+  const get = t.mock.method(request, "get", async (url, query) => {
+    assert.deepEqual(query, { begin_time: begin, end_time: endOfDay });
+    return [];
+  });
+  const client = await connect(t);
+  const result = await call(client, "list_gov_events", {
+    chain: "polkadot",
+    begin_time: "2025-03-01T00:00:00Z",
+    end_time: "2025-03-01T24:00:00Z",
+  });
+  assert.deepEqual([result.window.beginTime, result.window.endTime], [begin, endOfDay]);
+  assert.equal(result.window.endIso, "2025-03-02T00:00:00.000Z");
+  assert.equal(get.mock.callCount(), 1);
 });
 
 test("governance events count all matching records before truncating in chronological order", async (t) => {
@@ -1496,6 +1527,7 @@ test("governance event details use the identifiers for each upstream event type"
         type: "fellowship_treasury_spend_approved", category: "Collectives",
         index: 4, indexer: { blockTime },
       },
+      { type: "ambassador_referendum_confirmed", index: 12, indexer: { blockTime } },
     ];
   });
   const client = await connect(t);
@@ -1506,7 +1538,7 @@ test("governance event details use the identifiers for each upstream event type"
     events.items.map(({ referendumIndex, spendIndex, tipHash }) => [referendumIndex, spendIndex, tipHash]),
     [
       [1777, null, null], [0, null, null], [null, null, hash], [8, null, null],
-      [null, null, null], [240, null, null], [null, 4, null],
+      [null, 4, null], [240, null, null], [null, 4, null], [12, null, null],
     ],
   );
 });

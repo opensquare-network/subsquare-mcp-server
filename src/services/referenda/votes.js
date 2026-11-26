@@ -47,8 +47,8 @@ function toBigInt(value) {
   }
 
   const amount = new BigNumber(text);
-  if (!amount.isFinite()) {
-    throw new Error("[invalid_upstream_response] Vote amounts must be finite integers");
+  if (!amount.isFinite() || !amount.isInteger()) {
+    throw new Error("[invalid_upstream_response] Vote amounts must be integers in chain base units");
   }
 
   return BigInt(amount.toFixed(0));

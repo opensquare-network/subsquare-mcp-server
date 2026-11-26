@@ -24,7 +24,7 @@ Conventions:
 | --- | --- | --- | --- |
 | `gov_search` | `mode` = `keyword` \| `full_text` | Match keywords across governance modules (default), or search posts and comments with highlighted snippets. Text must have at least three characters unless it is a numeric ID such as `42`. Results include detail links or comment permalinks where available; Treasury tip links require both a block height and a hash. Projects include an `id` for `treasury_get_project_detail`; Wiki matches include their location and an excerpt. | Keyword: Polkadot, Kusama, Hydration, Polkadot Collectives. Full text: Polkadot |
 | `gov_overview` | — | Get active and total counts by module, and active counts by track. Includes both OpenGov and Fellowship tracks where available, distinguished by `referendumType`. Set `recent: true` for active or recently updated records. | Polkadot, Kusama, Hydration, Polkadot Collectives |
-| `list_gov_events` | — | List governance events between inclusive `begin_time` and `end_time` bounds, with category, sub-category, and type filters (e.g. `referenda_confirmed`). Set `summary: false` to include details such as the referendum index, Fellowship Treasury `spendIndex`, or Treasury tip hash. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `list_gov_events` | — | List governance events between inclusive `begin_time` and `end_time` bounds, with category, sub-category, and type filters (e.g. `referenda_confirmed`). Set `summary: false` to include details such as the referendum index, Treasury `spendIndex`, or Treasury tip hash. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 
 ## OpenGov and Referenda
 

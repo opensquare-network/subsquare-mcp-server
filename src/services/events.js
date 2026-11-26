@@ -2,7 +2,7 @@ import { getChainConfig } from "../config/chains.js";
 import { request } from "./api.js";
 
 const ISO_TIMESTAMP_PATTERN =
-  /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+  /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
 
 function getDaysInMonth(year, month) {
   if (month === 2) {
@@ -19,13 +19,23 @@ function parseIsoTimestamp(text) {
     return Number.NaN;
   }
 
-  const [, year, month, day, hour = "0", minute = "0", second = "0"] = match;
+  const [
+    , year, month, day, hour = "0", minute = "0", second = "0", fraction = "",
+  ] = match;
   const monthNumber = Number(month);
   const dayNumber = Number(day);
+  const hourNumber = Number(hour);
+  const minuteNumber = Number(minute);
+  const secondNumber = Number(second);
+  // ISO 8601 allows 24:00 as the end of the day, but nothing later.
+  const isEndOfDay = hourNumber === 24 &&
+    minuteNumber === 0 && secondNumber === 0 && !/[1-9]/.test(fraction);
+
   if (
     monthNumber < 1 || monthNumber > 12 ||
     dayNumber < 1 || dayNumber > getDaysInMonth(Number(year), monthNumber) ||
-    Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59
+    hourNumber > 24 || minuteNumber > 59 || secondNumber > 59 ||
+    (hourNumber === 24 && !isEndOfDay)
   ) {
     return Number.NaN;
   }
@@ -58,20 +68,38 @@ function compactSummaryEvent(item) {
   };
 }
 
-const FELLOWSHIP_TREASURY_SPEND_PREFIX = "fellowship_treasury_spend_";
+const TREASURY_SPEND_PREFIXES = [
+  "treasury_spend_",
+  "fellowship_treasury_spend_",
+];
+const REFERENDUM_EVENT_PREFIXES = [
+  "referenda_",
+  "fellowship_",
+  "ambassador_referendum_",
+];
+
+function isTreasurySpendEvent(type) {
+  return TREASURY_SPEND_PREFIXES.some((prefix) => type.startsWith(prefix));
+}
+
+function isReferendumEvent(type) {
+  return !isTreasurySpendEvent(type) &&
+    REFERENDUM_EVENT_PREFIXES.some((prefix) => type.startsWith(prefix));
+}
 
 function compactEvent(item) {
   const { proposal, ...data } = item.data ?? {};
   const type = String(item.type ?? "");
-  const isFellowshipTreasurySpend = type.startsWith(FELLOWSHIP_TREASURY_SPEND_PREFIX);
-  const isReferendum = !isFellowshipTreasurySpend &&
-    (type.startsWith("referenda_") || type.startsWith("fellowship_"));
+  // Subsquare stores the referendum index as `index` for referendum events,
+  // and the spend index as `index` for Treasury spend events.
+  const isTreasurySpend = isTreasurySpendEvent(type);
+  const isReferendum = isReferendumEvent(type);
 
   return {
     ...compactSummaryEvent(item),
     eventIndex: item.indexer?.eventIndex ?? null,
     referendumIndex: item.referendumIndex ?? (isReferendum ? item.index : null) ?? null,
-    spendIndex: item.spendIndex ?? (isFellowshipTreasurySpend ? item.index : null) ?? null,
+    spendIndex: item.spendIndex ?? (isTreasurySpend ? item.index : null) ?? null,
     bountyIndex: item.bountyIndex ?? null,
     childBountyIndex: item.childBountyIndex ?? null,
     proposalIndex: item.proposalIndex ?? null,
