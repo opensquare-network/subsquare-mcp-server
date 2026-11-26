@@ -36,6 +36,9 @@ const voteStatsSchema = z.object({
   votes: z.string().nullable(),
   ayes: z.string().nullable(),
   nays: z.string().nullable(),
+  totalCapital: z.string().nullable(),
+  turnoutRatio: z.number().nullable(),
+  turnoutPercent: z.number().nullable(),
   directCapital: z.string().nullable(),
   directAddresses: z.number().nullable(),
   delegationCapital: z.string().nullable(),
@@ -52,7 +55,7 @@ const tallyItemSchema = z.object({
   electorate: z.string().nullable(),
   approvalPercent: z.number().nullable(),
   supportPercent: z.number().nullable(),
-  turnoutPercent: z.number().nullable(),
+  turnoutPercent: z.number().nullable().describe("Null when the tally does not provide total voting capital"),
 });
 
 const votesOutputSchema = paginatedItemsSchema.extend({
@@ -82,7 +85,7 @@ export function registerReferendumVoteTools(server) {
     "list_referendum_votes",
     {
       description:
-        "List votes on one OpenGov or Fellowship referendum, sorted by voting power, with referendum-wide counts, balances, and conviction distribution. OpenGov turnout statistics are included when available; set include_stats=false to skip that lookup. Optionally include tally history. OpenGov amounts use chain base units.",
+        "List votes on one OpenGov or Fellowship referendum, sorted by voting power, with referendum-wide counts, balances, and conviction distribution. OpenGov statistics include turnout based on voting capital, not conviction-weighted votes; set include_stats=false to skip that lookup. Optionally include tally history. OpenGov amounts use chain base units.",
       inputSchema: z.object({
         chain: z
           .enum(subsquareApiChains)

@@ -18,6 +18,36 @@ export const TREASURY_NATIVE_ASSET_SYMBOLS = {
   [chains.hydration]: "HDX",
 };
 
+const TREASURY_POST_ROUTES = new Map([
+  ["treasurySpend", ["treasury/spends", (item) => item.index]],
+  ["treasuryProposal", ["treasury/proposals", (item) => item.proposalIndex]],
+  ["bounty", ["treasury/bounties", (item) => item.bountyIndex]],
+  ["childBounty", ["treasury/child-bounties", getChildBountyId]],
+  ["tip", ["treasury/tips", getTipId]],
+]);
+
+function getChildBountyId(item) {
+  if (item.parentBountyId == null || item.index == null) {
+    return null;
+  }
+
+  const id = `${item.parentBountyId}_${item.index}`;
+  if (!(item.hasSameParentAndIndex ?? item.onchainData?.hasSameParentAndIndex)) {
+    return id;
+  }
+
+  const height = item.indexerBlockHeight ?? item.indexer?.blockHeight;
+  return height == null ? null : `${id}_${height}`;
+}
+
+function getTipId({ height, hash }) {
+  if (!hash) {
+    return null;
+  }
+
+  return height == null ? hash : `${height}_${hash}`;
+}
+
 export function createTreasuryUrl(path, chain) {
   const { apiUrl } = getChainConfig(chain);
   return new URL(path, apiUrl);
@@ -25,6 +55,17 @@ export function createTreasuryUrl(path, chain) {
 
 export function createTreasuryItemUrl(path, index, chain) {
   return new URL(`${path}/${index}`, getChainConfig(chain).siteUrl).toString();
+}
+
+export function createTreasuryPostUrl(postType, item, chain) {
+  const route = TREASURY_POST_ROUTES.get(postType);
+  if (!route) {
+    return null;
+  }
+
+  const [path, getId] = route;
+  const id = getId(item);
+  return id == null ? null : createTreasuryItemUrl(path, id, chain);
 }
 
 export function formatTreasuryAmount(rawAmount, asset) {

@@ -42,7 +42,7 @@ export function registerTreasuryTools(server) {
     "treasury_list",
     {
       description:
-        "List Treasury records on a chain. kind=projects lists Polkadot project metadata without pagination; use treasury_get_project_detail for linked funding records. Tips, proposals, spends, and beneficiaries are paginated. On Polkadot and Kusama, beneficiaries are ranked by Subsquare's estimated USD value, with benefit counts and tags.",
+        "List Treasury records on a chain. kind=projects lists Polkadot project metadata without pagination; use treasury_get_project_detail for linked funding records. Tips, proposals, spends, and beneficiaries are paginated. On Polkadot and Kusama, beneficiaries are ranked by estimated USD of paid or awarded records. Beneficiary record counts include unpaid records.",
       inputSchema: z
         .object({
           chain: treasuryChain,
@@ -54,7 +54,7 @@ export function registerTreasuryTools(server) {
             .enum(["total_value", "awarded_value"])
             .optional()
             .describe(
-              "Only for beneficiaries: rank by total USD value (default total_value) or USD value at award finalization (awarded_value)",
+              "Only for beneficiaries: rank paid or awarded amounts by estimated USD at submission (total_value, default) or at finalization when available (awarded_value)",
             ),
         })
         .strict(),

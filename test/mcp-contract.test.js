@@ -568,8 +568,17 @@ test("tool discovery describes project lookup, pagination, amount units, and Ves
 
 test("governance search routes both modes and rejects non-Polkadot full-text searches", async (t) => {
   const wikiArticle = { location: "learn/budget/", title: "Budget", content: "Wiki excerpt" };
+  const hash = `0x${"a".repeat(64)}`;
   let fullText = {
-    items: [{ title: "Budget", content: "Account funding" }],
+    items: [
+      { type: "referendaReferendum", referendumIndex: 0, title: "Budget", content: "Account funding" },
+      { type: "tip", hash, title: "Budget tip" },
+      { type: "comment", postType: "tip", hash, height: 7, content: "Tip comment" },
+      {
+        type: "childBounty", parentBountyId: 2, index: 0,
+        hasSameParentAndIndex: true, indexerBlockHeight: 123,
+      },
+    ],
     projects: [{ id: "nova", name: "Nova", proposals: [{ id: 7 }] }],
     wiki: [],
   };
@@ -579,6 +588,7 @@ test("governance search routes both modes and rejects non-Polkadot full-text sea
       assert.deepEqual(query, { text: "Budget", max: 10 });
       return {
         openGovReferenda: [{ referendumIndex: 0, title: "Budget" }],
+        treasuryTips: [{ hash, height: 42, title: "Budget tip" }],
         wiki: [wikiArticle],
       };
     }
@@ -595,13 +605,22 @@ test("governance search routes both modes and rejects non-Polkadot full-text sea
   assert.equal(get.mock.callCount(), 0);
 
   const keyword = await call(client, "gov_search", { chain: "kusama", text: " Budget " });
-  assert.equal(keyword.results.openGovReferenda[0].url, "https://kusama.subsquare.io/referenda/referendum/0");
+  assert.equal(keyword.results.openGovReferenda[0].url, "https://kusama.subsquare.io/referenda/0");
+  const [keywordTip] = keyword.results.treasuryTips;
+  assert.equal(keywordTip.hash, hash);
+  assert.equal(keywordTip.height, 42);
+  assert.equal(keywordTip.url, `https://kusama.subsquare.io/treasury/tips/42_${hash}`);
   assert.deepEqual(keyword.results.wiki, [{ ...wikiArticle, contentTruncated: false }]);
 
   const args = { chain: "polkadot", mode: "full_text", text: "Budget", max: 4 };
   const result = await client.callTool({ name: "gov_search", arguments: args });
   assert.ok(!result.isError, result.content[0]?.text);
-  assert.equal(result.structuredContent.items[0].content, "Account funding");
+  const [referendum, tip, comment, childBounty] = result.structuredContent.items;
+  assert.equal(referendum.content, "Account funding");
+  assert.equal(tip.url, `https://polkadot.subsquare.io/treasury/tips/${hash}`);
+  assert.equal(comment.height, 7);
+  assert.equal(comment.url, `https://polkadot.subsquare.io/treasury/tips/${hash}#7`);
+  assert.equal(childBounty.url, "https://polkadot.subsquare.io/treasury/child-bounties/2_0_123");
   assert.deepEqual(result.structuredContent.projects, [{ id: "nova", name: "Nova" }]);
   assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
   fullText = { projects: [], wiki: [] };
@@ -609,6 +628,8 @@ test("governance search routes both modes and rejects non-Polkadot full-text sea
 });
 
 test("referendum vote type selects the route independently of the chain", async (t) => {
+  const electorate = "100000000000000000000";
+  const totalCapital = "1000000000000000000";
   let tally = [
     { indexer: { blockHeight: 1 }, tally: { ayes: "0x2", nays: "0x2" } },
     { indexer: { blockHeight: 2 }, tally: { ayes: "0x3", nays: "0x1" } },
@@ -622,7 +643,15 @@ test("referendum vote type selects the route independently of the chain", async 
           { account: "high", aye: true, balance: "90071992547409930", votes: "90071992547409930" },
         ];
       case "/gov2/referendums/0/vote-stats":
-        return { electorate: "100000000000000000" };
+        return { electorate, totalCapital, percentage: 0.01 };
+      case "/gov2/referenda/0/tally-history":
+        return [{
+          indexer: { blockHeight: 1 },
+          tally: {
+            ayes: "2000000000000000000", nays: "1000000000000000000",
+            support: "500000000000000000", issuance: electorate,
+          },
+        }];
       case "/fellowship/referenda/0/votes":
         return [{ account: address, isAye: true, votes: 3 }];
       case "/fellowship/referenda/0/tally-history":
@@ -638,13 +667,22 @@ test("referendum vote type selects the route independently of the chain", async 
     /\[unsupported_chain\].*polkadot, kusama, hydration/,
   );
   assert.equal(get.mock.callCount(), 0);
-  const opengov = await call(client, "list_referendum_votes", args);
+  const opengov = await call(client, "list_referendum_votes", {
+    ...args, include_tally_history: true,
+  });
   assert.deepEqual(opengov.items.map(({ account }) => account), ["high"]);
   assert.equal(opengov.total, 2);
   assert.equal(opengov.summary.totalVotes, "90071992547409934");
-  assert.equal(opengov.stats.electorate, "100000000000000000");
+  assert.equal(opengov.stats.electorate, electorate);
+  assert.equal(opengov.stats.totalCapital, totalCapital);
+  assert.equal(opengov.stats.turnoutRatio, 0.01);
+  assert.equal(opengov.stats.turnoutPercent, 1);
   assert.equal(opengov.statsStatus, "available");
-  assert.equal(opengov.tallyHistory, null);
+  const [snapshot] = opengov.tallyHistory.items;
+  assert.equal(snapshot.electorate, electorate);
+  assert.equal(snapshot.approvalPercent, 66.6667);
+  assert.equal(snapshot.supportPercent, 0.5);
+  assert.equal(snapshot.turnoutPercent, null);
 
   const fellowshipArgs = {
     ...args, referendum_type: "fellowship", include_tally_history: true, tally_limit: 1,
@@ -747,7 +785,8 @@ test("beneficiary activity validates each requested page rather than fabricating
 
 test("referendum details look up preimages only on request and share the standalone lookup", async (t) => {
   const hash = `0x${"a".repeat(64)}`;
-  const referendum = { onchainData: { proposalHash: hash } };
+  const uppercaseHash = `0x${"A".repeat(64)}`;
+  const referendum = { onchainData: { proposalHash: uppercaseHash } };
   const preimage = { decoded: { calls: [{ method: "fixture" }] } };
   let preimageStatus = 200;
   const get = t.mock.method(request, "get", async (url) => {
@@ -767,7 +806,9 @@ test("referendum details look up preimages only on request and share the standal
   assert.deepEqual(await detail(), referendum);
   assert.equal(get.mock.callCount(), 1);
   assert.deepEqual((await detail({ resolve_preimage: true })).preimage, preimage);
-  assert.deepEqual((await call(client, "get_preimage", { chain, hash })).preimage, preimage);
+  const resolved = await call(client, "get_preimage", { chain, hash: uppercaseHash });
+  assert.equal(resolved.hash, hash);
+  assert.deepEqual(resolved.preimage, preimage);
 
   preimageStatus = 404;
   assert.equal((await detail({ resolve_preimage: true })).preimage, null);
@@ -776,9 +817,12 @@ test("referendum details look up preimages only on request and share the standal
   await expectToolError(client, "get_preimage", { chain, hash }, /Fixture preimage lookup failed/);
 });
 
-test("track statistics and turnout keep their distinct upstream records", async (t) => {
-  t.mock.method(request, "get", async (url) => {
+test("track views fetch only their own upstream records and preserve the default summary", async (t) => {
+  const get = t.mock.method(request, "get", async (url) => {
     switch (url.pathname) {
+      case "/fellowship/tracks/summary":
+        assert.equal(url.hostname, "collectives-api.subsquare.io");
+        return [{ id: 1, name: "Rank 1", activeCount: 2 }];
       case "/referenda/summary":
         return {
           trackTurnouts: [{ id: 0, name: "Root", percentage: 0.2 }],
@@ -788,39 +832,68 @@ test("track statistics and turnout keep their distinct upstream records", async 
       case "/referenda/tracks":
         return [{ trackId: 0, statistics: { votes: { capital: "42" } } }];
       case "/referenda/tracks/0/turnout":
-        return [{ referendumIndex: 2 }, { referendumIndex: 3, ayes: "3", nays: "1" }];
+        return [{ referendumIndex: 2 }, { referendumIndex: 3, ayes: "2", nays: "1" }];
       default:
         assert.fail(`Unexpected track endpoint: ${url.pathname}`);
     }
   });
   const client = await connect(t);
+  const collectives = { chain: "collectives" };
+  assert.deepEqual(await call(client, "opengov_list_tracks", collectives), {
+    tracks: [{
+      id: 1, name: "Rank 1", activeCount: 2,
+      url: "https://collectives.subsquare.io/fellowship/tracks/1",
+    }],
+  });
+  await expectToolError(
+    client, "opengov_list_tracks", { ...collectives, view: "statistics" },
+    /\[unsupported_chain\].*view=summary/,
+  );
+  assert.equal(get.mock.callCount(), 1);
+
   const chain = "polkadot";
-  const stats = await call(client, "opengov_list_track_statistics", { chain });
+  const stats = await call(client, "opengov_list_tracks", { chain, view: "statistics" });
   assert.equal(stats.delegation, null);
   assert.deepEqual(
-    stats.items.map(({ trackId, turnoutPercent, referendaCount, delegatedCapital }) =>
+    stats.tracks.map(({ trackId, turnoutPercent, referendaCount, delegatedCapital }) =>
       [trackId, turnoutPercent, referendaCount, delegatedCapital]),
     [[0, 20, 10, "42"]],
   );
   const turnout = await call(client, "opengov_get_track_turnout", { chain, track_id: 0, limit: 1 });
   assert.equal(turnout.total, 2);
   assert.deepEqual(turnout.items.map(({ referendumIndex, approvalPercent }) =>
-    [referendumIndex, approvalPercent]), [[3, 75]]);
+    [referendumIndex, approvalPercent]), [[3, 66.6667]]);
 });
 
-test("Collectives overview includes its Fellowship tracks in structured output", async (t) => {
+test("overview returns both track types even when their IDs overlap", async (t) => {
   t.mock.method(request, "get", async (url) => {
-    assert.equal(url.hostname, "collectives-api.subsquare.io");
-    assert.equal(url.pathname, "/overview/recent/summary");
-    return {
+    const fellowship = {
       fellowshipReferenda: { active: 3 },
       fellowshipReferendaTracks: [{ id: 1, name: "Rank 1", activeCount: 3 }],
+    };
+    if (url.hostname === "collectives-api.subsquare.io") {
+      assert.equal(url.pathname, "/overview/recent/summary");
+      return fellowship;
+    }
+
+    assert.equal(url.hostname, "kusama-api.subsquare.io");
+    assert.equal(url.pathname, "/overview/summary");
+    return {
+      ...fellowship,
+      gov2ReferendaTracks: [{ id: 1, name: "Whitelisted Caller", activeCount: 5 }],
     };
   });
   const client = await connect(t);
   const { tracks, modules } = await call(client, "gov_overview", { chain: "collectives", recent: true });
-  assert.deepEqual(tracks, [{ id: 1, name: "Rank 1", activeCount: 3 }]);
+  const fellowshipTrack = { referendumType: "fellowship", id: 1, name: "Rank 1", activeCount: 3 };
+  assert.deepEqual(tracks, [fellowshipTrack]);
   assert.deepEqual(modules, [{ module: "fellowshipReferenda", active: 3, all: null }]);
+
+  const kusama = await call(client, "gov_overview", { chain: "kusama" });
+  assert.deepEqual(kusama.tracks, [
+    { referendumType: "opengov", id: 1, name: "Whitelisted Caller", activeCount: 5 },
+    fellowshipTrack,
+  ]);
 });
 
 test("governance event windows are inclusive and invalid timestamps fail before an upstream call", async (t) => {

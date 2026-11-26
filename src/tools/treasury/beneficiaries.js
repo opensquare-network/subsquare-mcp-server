@@ -18,19 +18,27 @@ const beneficiaryChain = z
 
 const benefitModule = z.enum(TREASURY_BENEFIT_MODULES);
 
+const beneficiaryRecordCount = z
+  .number()
+  .nullable()
+  .describe("Records naming the address as beneficiary, including unpaid records");
+const estimatedUsd = z.union([z.number(), z.string()]).nullable();
+const fiatAtSubmission = estimatedUsd.describe("Estimated USD of paid or awarded records at submission prices");
+const fiatAtFinal = estimatedUsd.describe("Estimated USD of paid or awarded records using finalization prices when available");
+
 const benefitCountsSchema = z
   .object({
-    benefitCount: z.number().nullable(),
-    benefitFiatValue: z.union([z.number(), z.string()]).nullable(),
-    benefitFiatValueAtFinal: z.union([z.number(), z.string()]).nullable(),
+    benefitCount: beneficiaryRecordCount,
+    benefitFiatValue: fiatAtSubmission,
+    benefitFiatValueAtFinal: fiatAtFinal,
   })
   .nullable();
 
 const beneficiarySchema = z.object({
   address: z.string().nullable(),
-  totalBenefitCount: z.number().nullable(),
-  totalBenefitFiatValue: z.union([z.number(), z.string()]).nullable(),
-  totalBenefitFiatValueAtFinal: z.union([z.number(), z.string()]).nullable(),
+  totalBenefitCount: beneficiaryRecordCount,
+  totalBenefitFiatValue: fiatAtSubmission,
+  totalBenefitFiatValueAtFinal: fiatAtFinal,
   tags: z.array(z.string()),
   spends: benefitCountsSchema,
   proposals: benefitCountsSchema,
@@ -62,7 +70,7 @@ export function registerTreasuryBeneficiaryTools(server) {
     "get_address_treasury_benefits",
     {
       description:
-        "Get the treasury funds an address has received: a per-module summary of awarded counts and USD values, plus paginated lists of the treasury spends, proposals, tips, bounties and child bounties naming the address as beneficiary. Use it to answer what an address received from the treasury, as opposed to what it submitted.",
+        "Get paginated treasury spends, proposals, tips, bounties and child bounties naming an address as beneficiary, with per-module counts and estimated USD values. Counts and record lists include unpaid records; the USD estimates cover only paid or awarded records.",
       inputSchema: z.object({
         chain: beneficiaryChain,
         address: accountAddress,
@@ -78,7 +86,7 @@ export function registerTreasuryBeneficiaryTools(server) {
       outputSchema: {
         chain: z.string(),
         address: z.string(),
-        isBeneficiary: z.boolean(),
+        isBeneficiary: z.boolean().describe("Whether there is an indexed beneficiary summary, not whether the address was paid"),
         summary: beneficiarySchema.nullable(),
         modules: z.array(benefitModuleOutputSchema),
         source: z.array(z.string()),

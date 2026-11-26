@@ -1,6 +1,7 @@
 import pick from "lodash/pick.js";
 import { getChainConfig } from "../config/chains.js";
 import { request } from "./api.js";
+import { createTreasuryPostUrl } from "./treasury/common.js";
 import { summarizeTreasuryProject } from "./treasury/projects/fetch.js";
 
 const FULL_TEXT_CONTENT_LIMIT = 400;
@@ -12,6 +13,8 @@ const ITEM_FIELDS = [
   "proposalIndex",
   "index",
   "parentBountyId",
+  "height",
+  "hash",
   "legacyIndex",
   "track",
   "trackInfo",
@@ -28,83 +31,39 @@ const ITEM_FIELDS = [
   "fiatAtFinal",
 ];
 
-const GROUP_URL_PATHS = {
-  openGovReferenda: {
-    field: "referendumIndex",
-    path: (index) => `referenda/referendum/${index}`,
-  },
-  democracyReferenda: {
-    field: "referendumIndex",
-    path: (index) => `democracy/referendum/${index}`,
-  },
-  fellowshipReferenda: {
-    field: "referendumIndex",
-    path: (index) => `fellowship/referendum/${index}`,
-  },
-  bounties: {
-    field: "bountyIndex",
-    path: (index) => `treasury/bounty/${index}`,
-  },
-  treasuryProposals: {
-    field: "proposalIndex",
-    path: (index) => `treasury/proposal/${index}`,
-  },
-  treasurySpends: {
-    field: "index",
-    path: (index) => `treasury/spends/${index}`,
-  },
-  treasuryTips: {
-    field: "tipIndex",
-    fallbackField: "index",
-    path: (index) => `treasury/tip/${index}`,
-  },
-};
+const KEYWORD_POST_TYPES = new Map([
+  ["openGovReferenda", "referendaReferendum"],
+  ["democracyReferenda", "democracyReferendum"],
+  ["fellowshipReferenda", "fellowshipReferendum"],
+  ["fellowshipTreasurySpends", "fellowshipTreasurySpend"],
+  ["bounties", "bounty"],
+  ["childBounties", "childBounty"],
+  ["treasuryProposals", "treasuryProposal"],
+  ["treasurySpends", "treasurySpend"],
+  ["treasuryTips", "tip"],
+]);
 
-const FULL_TEXT_URL_PATHS = {
-  referendaReferendum: (item) =>
-    item.referendumIndex == null
-      ? null
-      : `referenda/referendum/${item.referendumIndex}`,
-  democracyReferendum: (item) =>
-    item.referendumIndex == null
-      ? null
-      : `democracy/referendum/${item.referendumIndex}`,
-  bounty: (item) =>
-    item.bountyIndex == null ? null : `treasury/bounty/${item.bountyIndex}`,
-  childBounty: (item) =>
-    item.parentBountyId == null || item.index == null
-      ? null
-      : `treasury/child-bounty/${item.parentBountyId}_${item.index}`,
-  treasuryProposal: (item) =>
-    item.proposalIndex == null
-      ? null
-      : `treasury/proposal/${item.proposalIndex}`,
-  treasurySpend: (item) =>
-    item.index == null ? null : `treasury/spends/${item.index}`,
-};
+const GOVERNANCE_POST_ROUTES = new Map([
+  ["referendaReferendum", ["referenda", "referendumIndex"]],
+  ["democracyReferendum", ["democracy/referenda", "referendumIndex"]],
+  ["fellowshipReferendum", ["fellowship/referenda", "referendumIndex"]],
+  ["fellowshipTreasurySpend", ["fellowship/treasury/spends", "index"]],
+]);
 
-function createGroupUrl(groupName, item, siteUrl) {
-  if (groupName === "childBounties") {
-    return item.parentBountyId == null || item.index == null
-      ? null
-      : new URL(
-          `treasury/child-bounty/${item.parentBountyId}_${item.index}`,
-          siteUrl,
-        ).toString();
+function createSearchItemUrl(postType, item, chain) {
+  const route = GOVERNANCE_POST_ROUTES.get(postType);
+  if (!route) {
+    return createTreasuryPostUrl(postType, item, chain);
   }
 
-  const groupPath = GROUP_URL_PATHS[groupName];
-  if (!groupPath) {
-    return null;
-  }
-
-  const index =
-    item[groupPath.field] ??
-    (groupPath.fallbackField ? item[groupPath.fallbackField] : null);
-  return index == null ? null : new URL(groupPath.path(index), siteUrl).toString();
+  const [path, indexField] = route;
+  const index = item[indexField];
+  return index == null
+    ? null
+    : new URL(`${path}/${index}`, getChainConfig(chain).siteUrl).toString();
 }
 
-function compactSearchItem(groupName, item, siteUrl) {
+function compactSearchItem(groupName, item, chain) {
   if (groupName === "projects") {
     return summarizeTreasuryProject(item);
   }
@@ -118,18 +77,8 @@ function compactSearchItem(groupName, item, siteUrl) {
     ...itemFields,
     trackName: trackInfo?.name ?? null,
     state: item.state?.state ?? item.state ?? null,
-    url: createGroupUrl(groupName, item, siteUrl),
+    url: createSearchItemUrl(KEYWORD_POST_TYPES.get(groupName), item, chain),
   };
-}
-
-function createFullTextUrl(item, siteUrl) {
-  const createPath = FULL_TEXT_URL_PATHS[item.type];
-  if (!createPath) {
-    return null;
-  }
-
-  const path = createPath(item);
-  return path == null ? null : new URL(path, siteUrl).toString();
 }
 
 function truncateContent(content) {
@@ -147,7 +96,13 @@ function truncateContent(content) {
   };
 }
 
-function compactFullTextItem(item, siteUrl) {
+function compactFullTextItem(item, chain) {
+  const isComment = item.type === "comment";
+  // A comment's height is its anchor, not part of the parent tip's ID.
+  const postUrl = isComment
+    ? createSearchItemUrl(item.postType, { ...item, height: undefined }, chain)
+    : createSearchItemUrl(item.type, item, chain);
+
   return {
     type: item.type ?? null,
     title: item.title ?? null,
@@ -159,9 +114,13 @@ function compactFullTextItem(item, siteUrl) {
     parentBountyId: item.parentBountyId ?? null,
     postType: item.postType ?? null,
     postId: item.postId ?? null,
+    height: item.height ?? null,
+    hash: item.hash ?? null,
     ...truncateContent(item.content),
     highlight: item.highlight ?? null,
-    url: createFullTextUrl(item, siteUrl),
+    url: isComment && postUrl && item.height != null
+      ? `${postUrl}#${item.height}`
+      : postUrl,
   };
 }
 
@@ -174,7 +133,7 @@ function compactWikiItem(item) {
 }
 
 export async function searchGovernance({ chain, text, max } = {}) {
-  const { apiUrl, siteUrl } = getChainConfig(chain);
+  const { apiUrl } = getChainConfig(chain);
   const endpoint = new URL("search", apiUrl);
   const response = await request.get(endpoint, { text, max });
 
@@ -188,7 +147,7 @@ export async function searchGovernance({ chain, text, max } = {}) {
       .filter(([, items]) => items.length > 0)
       .map(([groupName, items]) => [
         groupName,
-        items.map((item) => compactSearchItem(groupName, item, siteUrl)),
+        items.map((item) => compactSearchItem(groupName, item, chain)),
       ]),
   );
   const counts = Object.fromEntries(
@@ -209,7 +168,7 @@ export async function searchGovernance({ chain, text, max } = {}) {
 }
 
 export async function searchFullText({ chain, text, max } = {}) {
-  const { apiUrl, siteUrl } = getChainConfig(chain);
+  const { apiUrl } = getChainConfig(chain);
   const endpoint = new URL("search/full-text", apiUrl);
   const response = await request.get(endpoint, { text, max });
 
@@ -221,7 +180,7 @@ export async function searchFullText({ chain, text, max } = {}) {
     }
   }
 
-  const items = response.items.map((item) => compactFullTextItem(item, siteUrl));
+  const items = response.items.map((item) => compactFullTextItem(item, chain));
   const projects = response.projects.map(summarizeTreasuryProject);
   const wiki = response.wiki.map(compactWikiItem);
 

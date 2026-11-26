@@ -3,7 +3,8 @@ import { ApiRequestError, request } from "./api.js";
 
 export async function getPreimage({ chain, hash } = {}) {
   const { apiUrl } = getChainConfig(chain);
-  const endpoint = new URL(`preimages/${encodeURIComponent(hash)}`, apiUrl);
+  const normalizedHash = hash.toLowerCase();
+  const endpoint = new URL(`preimages/${encodeURIComponent(normalizedHash)}`, apiUrl);
 
   try {
     const preimage = await request.get(endpoint);
@@ -13,7 +14,7 @@ export async function getPreimage({ chain, hash } = {}) {
 
     return {
       chain,
-      hash,
+      hash: normalizedHash,
       found: true,
       preimage,
       source: endpoint.toString(),
@@ -25,7 +26,7 @@ export async function getPreimage({ chain, hash } = {}) {
 
     return {
       chain,
-      hash,
+      hash: normalizedHash,
       found: false,
       preimage: null,
       source: endpoint.toString(),

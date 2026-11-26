@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { opengovChains } from "../config/chains.js";
+import { opengovChains, subsquareApiChains } from "../config/chains.js";
+import { listTracks } from "../services/opengov/index.js";
 import {
   getTrackTurnout,
   listTrackStatistics,
@@ -18,6 +19,18 @@ const trackId = z
   .int()
   .nonnegative()
   .describe("OpenGov governance track ID");
+
+const trackSummarySchema = z.object({
+  id: z.number().int().nonnegative().describe("Governance track ID"),
+  name: z.string().describe("Governance track name"),
+  activeCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .nullable()
+    .describe("Number of active referenda on this track, or null when unavailable"),
+  url: z.string().url().describe("SubSquare page for this governance track"),
+});
 
 const trackStatisticsSchema = z.object({
   trackId: z.number().int().nonnegative(),
@@ -51,28 +64,47 @@ const turnoutItemSchema = z.object({
 
 export function registerOpenGovTrackTools(server) {
   server.registerTool(
-    "opengov_list_track_statistics",
+    "opengov_list_tracks",
     {
       description:
-        "List OpenGov tracks with the Subsquare track turnout summary (ratio of supporting capital to electorate), referenda counts, and delegation statistics (delegators, delegatees, delegated capital and votes). Use it to compare governance activity and delegation across tracks. Amounts use chain base units.",
-      inputSchema: z.object({ chain: opengovChain }).strict(),
+        "List track IDs, names, active referendum counts, and detail URLs. The default summary view returns Fellowship tracks on Collectives. Use view=statistics to compare OpenGov tracks by voting capital relative to electorate, referenda counts, and delegation statistics. Statistics amounts use chain base units.",
+      inputSchema: z.object({
+        chain: z.enum(subsquareApiChains),
+        view: z
+          .enum(["summary", "statistics"])
+          .default("summary")
+          .describe("Basic track summaries (default) or OpenGov statistics on polkadot, kusama, and hydration"),
+      }).strict(),
       outputSchema: {
-        chain: z.string(),
-        totalReferendaCount: z.number().nullable(),
+        tracks: z.array(z.union([trackSummarySchema, trackStatisticsSchema])),
+        chain: z.string().optional(),
+        totalReferendaCount: z.number().nullable().optional(),
         delegation: z
           .object({
             delegator: z.number().nullable(),
             delegatee: z.number().nullable(),
             capital: z.string().nullable(),
           })
-          .nullable(),
-        total: z.number().int().nonnegative(),
-        items: z.array(trackStatisticsSchema),
-        source: z.array(z.string()),
+          .nullable()
+          .optional(),
+        total: z.number().int().nonnegative().optional(),
+        source: z.array(z.string()).optional(),
       },
       annotations: readOnlyAnnotations,
     },
-    async (args) => createStructuredJsonResult(await listTrackStatistics(args)),
+    async ({ chain, view }) => {
+      if (view === "summary") {
+        return createStructuredJsonResult(await listTracks({ chain }));
+      }
+
+      if (!opengovChains.includes(chain)) {
+        throw new Error(
+          `[unsupported_chain] view=statistics is not available on ${chain}. Hint: use view=summary or select one of ${opengovChains.join(", ")}.`,
+        );
+      }
+
+      return createStructuredJsonResult(await listTrackStatistics({ chain }));
+    },
   );
 
   server.registerTool(
@@ -104,5 +136,4 @@ export function registerOpenGovTrackTools(server) {
     },
     async (args) => createStructuredJsonResult(await getTrackTurnout(args)),
   );
-
 }

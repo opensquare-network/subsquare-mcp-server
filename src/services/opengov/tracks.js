@@ -1,25 +1,8 @@
 import { getChainConfig } from "../../config/chains.js";
+import { getApprovalPercent, toPercent } from "../../utils/percentage.js";
 import { request } from "../api.js";
 
 const DEFAULT_TURNOUT_LIMIT = 20;
-
-function toPercent(ratio) {
-  if (typeof ratio !== "number" || !Number.isFinite(ratio)) {
-    return null;
-  }
-
-  return Number((ratio * 100).toFixed(4));
-}
-
-function getApprovalPercent(ayes, nays) {
-  if (ayes == null || nays == null) {
-    return null;
-  }
-
-  const ayeVotes = BigInt(ayes);
-  const total = ayeVotes + BigInt(nays);
-  return total === 0n ? null : Number((ayeVotes * 1_000_000n) / total) / 10_000;
-}
 
 function getTrackStatistics(track) {
   const statistics = track?.statistics ?? {};
@@ -94,7 +77,7 @@ export async function listTrackStatistics({ chain } = {}) {
         }
       : null,
     total: items.length,
-    items,
+    tracks: items,
     source: [summaryUrl.toString(), tracksUrl.toString()],
   };
 }

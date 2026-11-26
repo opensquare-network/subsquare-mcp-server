@@ -29,11 +29,7 @@ function compactEvent(item) {
   const { proposal, ...data } = item.data ?? {};
 
   return {
-    type: item.type ?? null,
-    category: item.category ?? null,
-    subCategory: item.subCategory ?? null,
-    blockHeight: item.indexer?.blockHeight ?? null,
-    blockTime: item.indexer?.blockTime ?? null,
+    ...compactSummaryEvent(item),
     eventIndex: item.indexer?.eventIndex ?? null,
     referendumIndex: item.referendumIndex ?? null,
     bountyIndex: item.bountyIndex ?? null,

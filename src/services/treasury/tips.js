@@ -2,7 +2,7 @@ import pick from "lodash/pick.js";
 import { requirePaginatedResponse } from "../../utils/pagination.js";
 import { request } from "../api.js";
 import { createIdentityResolver } from "../identity.js";
-import { createTreasuryItemUrl, createTreasuryUrl } from "./common.js";
+import { createTreasuryPostUrl, createTreasuryUrl } from "./common.js";
 
 const TREASURY_TIPS_API_PATH = "treasury/tips";
 const TREASURY_TIP_FIELDS = [
@@ -14,18 +14,6 @@ const TREASURY_TIP_FIELDS = [
   "lastActivityAt",
   "commentsCount",
 ];
-
-function createTreasuryTipUrl(item, chain) {
-  if (item.height == null || !item.hash) {
-    return null;
-  }
-
-  return createTreasuryItemUrl(
-    TREASURY_TIPS_API_PATH,
-    `${item.height}_${item.hash}`,
-    chain,
-  );
-}
 
 export async function listTreasuryTips({ chain, ...query } = {}) {
   const response = await request.get(
@@ -51,7 +39,7 @@ export async function listTreasuryTips({ chain, ...query } = {}) {
       finderIdentity: resolveIdentity(item.finder),
       beneficiaryIdentity: resolveIdentity(item.beneficiary),
       medianValue: item.onchainData?.medianValue ?? null,
-      url: createTreasuryTipUrl(item, chain),
+      url: item.height == null ? null : createTreasuryPostUrl("tip", item, chain),
     })),
   };
 }

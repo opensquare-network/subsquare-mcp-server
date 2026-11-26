@@ -23,7 +23,7 @@ export function registerSearchTools(server) {
     "gov_search",
     {
       description:
-        "Search Subsquare governance content. mode=keyword matches text across modules such as referenda, treasury, and Fellowship, with results grouped by module. mode=full_text searches posts and comments with highlighted snippets on Polkadot. Projects and Wiki articles are included where available.",
+        "Search Subsquare governance content. mode=keyword matches text across modules such as referenda, treasury, and Fellowship, with results grouped by module. mode=full_text searches posts and comments with highlighted snippets on Polkadot. Results include detail links or comment permalinks where available. Projects and Wiki articles are included where available.",
       inputSchema: z.object({
         chain: z
           .enum(subsquareApiChains)

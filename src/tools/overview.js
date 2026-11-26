@@ -8,7 +8,7 @@ export function registerOverviewTools(server) {
     "gov_overview",
     {
       description:
-        "Get active and total counts for governance modules such as discussions, referenda, treasury, and Fellowship. Includes per-track activity for OpenGov or Fellowship on Collectives. Use this overview before drilling into a module.",
+        "Get active and total counts for governance modules such as discussions, referenda, treasury, and Fellowship. Includes OpenGov and Fellowship track activity where available. Use this overview before drilling into a module.",
       inputSchema: z.object({
         chain: z
           .enum(subsquareApiChains)
@@ -29,6 +29,7 @@ export function registerOverviewTools(server) {
           all: z.number().int().nonnegative().nullable(),
         })),
         tracks: z.array(z.object({
+          referendumType: z.enum(["opengov", "fellowship"]),
           id: z.number().int().nonnegative().nullable(),
           name: z.string().nullable(),
           activeCount: z.number().int().nonnegative().nullable(),

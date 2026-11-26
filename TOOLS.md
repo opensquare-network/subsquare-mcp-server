@@ -1,6 +1,6 @@
 # MCP Tools
 
-The server exposes **46 read-only tools**. Related records are often grouped in one tool
+The server exposes **45 read-only tools**. Related records are often grouped in one tool
 and selected with an enum argument (`kind`, `view`, `mode`, `bounty_type`, or `referendum_type`).
 Dedicated statistics tools do not load the related lists, profiles, or details.
 
@@ -22,8 +22,8 @@ Conventions:
 
 | Tool | Enum | Description | Chains |
 | --- | --- | --- | --- |
-| `gov_search` | `mode` = `keyword` \| `full_text` | Match keywords across governance modules (default), or search posts and comments with highlighted snippets. Projects include an `id` for `treasury_get_project_detail`; Wiki matches include their location and an excerpt. | Keyword: Polkadot, Kusama, Hydration, Polkadot Collectives. Full text: Polkadot |
-| `gov_overview` | — | Get active and total counts by module and by track (Fellowship tracks on Collectives). Set `recent: true` for active or recently updated records. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `gov_search` | `mode` = `keyword` \| `full_text` | Match keywords across governance modules (default), or search posts and comments with highlighted snippets. Results include detail links or comment permalinks where available. Projects include an `id` for `treasury_get_project_detail`; Wiki matches include their location and an excerpt. | Keyword: Polkadot, Kusama, Hydration, Polkadot Collectives. Full text: Polkadot |
+| `gov_overview` | — | Get active and total counts by module, and active counts by track. Includes both OpenGov and Fellowship tracks where available, distinguished by `referendumType`. Set `recent: true` for active or recently updated records. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `list_gov_events` | — | List governance events between inclusive `begin_time` and `end_time` bounds, with category, sub-category, and type filters. Set `summary: false` to include details. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 
 ## OpenGov and Referenda
@@ -33,11 +33,10 @@ Conventions:
 | `opengov_list_referenda` | — | List and filter referenda, or use `proposer` to list one user's referenda (not on Collectives). Set `include_summary: true` for chain-wide state counts, cached for one minute. `summaryStatus` is `available`, `not_requested`, or `unavailable`. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `opengov_referenda_summary` | — | Get chain-wide state counts without fetching a referendum list. Shares the one-minute cache with `opengov_list_referenda`. On Collectives, returns Fellowship counts. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `opengov_referendum_detail` | — | Get one referendum's full details. Set `resolve_preimage: true` to also look up the decoded proposal preimage. | Polkadot, Kusama, Hydration, Polkadot Collectives |
-| `get_preimage` | — | Look up a decoded preimage by its 0x-prefixed hash, including nested batched calls. `found` is false when no preimage is stored. | Polkadot, Kusama, Hydration, Polkadot Collectives |
-| `opengov_list_tracks` | — | List track IDs, names, active referendum counts, and detail URLs. Collectives returns Fellowship tracks. | Polkadot, Kusama, Hydration, Polkadot Collectives |
-| `opengov_list_track_statistics` | — | Compare OpenGov tracks by turnout ratios, referendum counts, and delegation statistics. | Polkadot, Kusama, Hydration |
+| `get_preimage` | — | Look up a decoded preimage by its 0x-prefixed hash, including nested batched calls. Hexadecimal digits are case-insensitive; the returned hash is lowercase. `found` is false when no preimage is stored. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `opengov_list_tracks` | `view` = `summary` \| `statistics` | `summary` (default) lists IDs, names, active counts, and detail URLs; Collectives returns Fellowship tracks. `statistics` compares OpenGov tracks by turnout, referendum counts, and delegation. Both return their records in `tracks`. | Summary: Polkadot, Kusama, Hydration, Polkadot Collectives. Statistics: Polkadot, Kusama, Hydration |
 | `opengov_get_track_turnout` | — | Get one track's per-referendum turnout series with turnout and approval percentages. | Polkadot, Kusama, Hydration |
-| `list_referendum_votes` | `referendum_type` = `opengov` \| `fellowship` | List votes with a referendum-wide summary. For OpenGov, set `include_stats: false` to skip the turnout lookup. `statsStatus` is `available`, `not_requested`, `unavailable`, or `unsupported` (Fellowship). Set `include_tally_history: true` to include the tally series; `tally_limit` only applies in that case. | OpenGov: Polkadot, Kusama, Hydration. Fellowship: Kusama, Polkadot Collectives |
+| `list_referendum_votes` | `referendum_type` = `opengov` \| `fellowship` | List votes with a referendum-wide summary. OpenGov `stats` include `totalCapital` and the indexed turnout as `turnoutRatio` and `turnoutPercent`; set `include_stats: false` to skip the lookup. `statsStatus` is `available`, `not_requested`, `unavailable`, or `unsupported` (Fellowship). Set `include_tally_history: true` to include the tally series. Historical support uses the recorded issuance; historical turnout is null without voting capital. `tally_limit` only applies to the series. | OpenGov: Polkadot, Kusama, Hydration. Fellowship: Kusama, Polkadot Collectives |
 | `list_referendum_comments` | `referendum_type` = `opengov` \| `fellowship` \| `ambassador` | List referendum comments with reactions and nested replies. Use `page_size` and `include_polkassembly` (set to `false` to exclude Polkassembly comments); legacy `pageSize` and `includePolkassembly` are rejected. | OpenGov: Polkadot, Kusama, Hydration. Fellowship: Polkadot Collectives, Kusama. Ambassador: Polkadot Collectives |
 | `opengov_list_delegations` | `view` = `delegates` \| `delegators` \| `track` \| `track_delegatees` | List delegates with statistics, one delegate's delegators (`address`), delegation relationships for one `track_id`, or ranked delegatees for one `track_id`. `sort_by` and `sort_order` apply only to `track_delegatees`. `page_size` defaults to 100 for `delegators`, 25 otherwise. | Polkadot, Kusama, Hydration |
 
@@ -53,8 +52,8 @@ Conventions:
 
 | Tool | Enum | Description | Chains |
 | --- | --- | --- | --- |
-| `treasury_list` | `kind` = `projects` \| `tips` \| `proposals` \| `spends` \| `beneficiaries` | Return all projects or paginated tips, proposals, spends, or beneficiaries. Use `sort_by` to rank beneficiaries by estimated USD value. Use `treasury_get_project_detail` for a project's linked funding records. | Projects: Polkadot. Beneficiaries: Polkadot, Kusama. Tips, proposals, spends: Polkadot, Kusama, Hydration |
-| `get_address_treasury_benefits` | — | Get one address's benefit counts and USD values, with paginated beneficiary records for all or selected Treasury modules. A module returning HTTP 404 is marked `supported: false` with an `error` and null page fields, not an empty page. | Polkadot, Kusama |
+| `treasury_list` | `kind` = `projects` \| `tips` \| `proposals` \| `spends` \| `beneficiaries` | Return all projects or paginated tips, proposals, spends, or beneficiaries. Beneficiary counts include unpaid records. Use `sort_by` to rank paid or awarded amounts by estimated USD at submission (`total_value`) or at finalization when available (`awarded_value`). Use `treasury_get_project_detail` for a project's linked funding records. | Projects: Polkadot. Beneficiaries: Polkadot, Kusama. Tips, proposals, spends: Polkadot, Kusama, Hydration |
+| `get_address_treasury_benefits` | — | Get paginated records naming an address as beneficiary for all or selected Treasury modules. Counts and record lists include unpaid records; the estimated USD totals cover only paid or awarded records. A module returning HTTP 404 is marked `supported: false` with an `error` and null page fields, not an empty page. | Polkadot, Kusama |
 | `treasury_get` | `view` = `status` \| `burn` | Summarize Treasury activity counts, or get cumulative burns with paginated records and optional history. Pagination and `include_history` apply only to `view=burn`. | Polkadot, Kusama, Hydration |
 | `treasury_get_balances` | — | Get Treasury balances reported by DotTreasury for one chain or every reported chain. | Polkadot, Kusama, Hydration, Acala, Karura, Bifrost, Astar |
 | `treasury_get_project_detail` | — | Get one Polkadot Treasury project with its linked proposals, spends, tips, bounties, and child bounties. | Polkadot |
@@ -117,4 +116,5 @@ Conventions:
 | `opengov_list_referendum_votes` | `list_referendum_votes` with `referendum_type=opengov` |
 | `fellowship_list_referendum_votes` | `list_referendum_votes` with `referendum_type=fellowship` |
 | `opengov_list_track_delegatees` | `opengov_list_delegations` with `view=track_delegatees` |
+| `opengov_list_track_statistics` | `opengov_list_tracks` with `view=statistics` |
 | `treasury_list_beneficiaries` | `treasury_list` with `kind=beneficiaries` |

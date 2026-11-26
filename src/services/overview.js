@@ -28,17 +28,22 @@ function createModuleList(payload) {
   return modules;
 }
 
-function createTrackList(payload) {
-  const tracks = payload.gov2ReferendaTracks ?? payload.fellowshipReferendaTracks ?? [];
-  if (!Array.isArray(tracks)) {
-    throw new Error("[invalid_upstream_response] SubSquare overview tracks were not an array");
-  }
+function createTrackList({ gov2ReferendaTracks, fellowshipReferendaTracks }) {
+  return [
+    ["opengov", gov2ReferendaTracks ?? []],
+    ["fellowship", fellowshipReferendaTracks ?? []],
+  ].flatMap(([referendumType, tracks]) => {
+    if (!Array.isArray(tracks)) {
+      throw new Error(`[invalid_upstream_response] SubSquare overview ${referendumType} tracks were not an array`);
+    }
 
-  return tracks.map((track) => ({
-    id: track.id ?? track.trackId ?? null,
-    name: track.name ?? track.trackName ?? null,
-    activeCount: track.activeCount ?? null,
-  }));
+    return tracks.map((track) => ({
+      referendumType,
+      id: track.id ?? track.trackId ?? null,
+      name: track.name ?? track.trackName ?? null,
+      activeCount: track.activeCount ?? null,
+    }));
+  });
 }
 
 export async function getGovernanceOverview({ chain, recent = false } = {}) {

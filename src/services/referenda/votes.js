@@ -1,3 +1,4 @@
+import { getApprovalPercent, toPercent } from "../../utils/percentage.js";
 import { ApiRequestError, request } from "../api.js";
 import { resolveItemIdentities } from "../identity.js";
 import { getReferendumVoteEndpoints } from "../opengov/paths.js";
@@ -205,6 +206,9 @@ function compactVoteStats(stats) {
     votes: stats.votes ?? null,
     ayes: stats.ayes ?? null,
     nays: stats.nays ?? null,
+    totalCapital: stats.totalCapital ?? null,
+    turnoutRatio: stats.percentage ?? null,
+    turnoutPercent: toPercent(stats.percentage),
     directCapital: stats.directCapital ?? null,
     directAddresses: stats.directAddresses ?? null,
     delegationCapital: stats.delegationCapital ?? null,
@@ -225,27 +229,12 @@ function toDecimalString(value) {
   return String(value);
 }
 
-function toRatioPercent(numerator, denominator) {
-  if (numerator == null || denominator == null) {
-    return null;
-  }
-
-  const total = toBigInt(denominator);
-  if (total === 0n) {
-    return null;
-  }
-
-  const parts = (Number(toBigInt(numerator)) / Number(total)) * 100;
-  return Number.isFinite(parts) ? Number(parts.toFixed(4)) : null;
-}
-
 function compactTallyItem(item) {
   const tally = item?.tally ?? {};
   const ayes = toDecimalString(tally.ayes);
   const nays = toDecimalString(tally.nays);
   const support = toDecimalString(tally.support);
-  const electorate = toDecimalString(tally.electorate);
-  const votes = ayes == null || nays == null ? null : toBigInt(ayes) + toBigInt(nays);
+  const electorate = toDecimalString(tally.issuance ?? tally.electorate);
 
   return {
     blockHeight: item?.indexer?.blockHeight ?? null,
@@ -254,9 +243,9 @@ function compactTallyItem(item) {
     nays,
     support,
     electorate,
-    approvalPercent: toRatioPercent(ayes, votes),
-    supportPercent: toRatioPercent(support, electorate),
-    turnoutPercent: toRatioPercent(votes, electorate),
+    approvalPercent: getApprovalPercent(ayes, nays),
+    supportPercent: toPercent(support, electorate),
+    turnoutPercent: toPercent(tally.totalCapital, electorate),
   };
 }
 

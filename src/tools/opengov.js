@@ -4,7 +4,6 @@ import {
   getReferendaSummary,
   getReferendum,
   listReferenda,
-  listTracks,
 } from "../services/opengov/index.js";
 import {
   createStructuredJsonResult,
@@ -132,37 +131,6 @@ export function registerOpengovTools(server) {
       annotations: readOnlyAnnotations,
     },
     async (args) => createStructuredJsonResult(await getReferendum(args)),
-  );
-
-  server.registerTool(
-    "opengov_list_tracks",
-    {
-      description:
-        "List governance track IDs, names, active referendum counts, and SubSquare detail URLs. On collectives, returns Fellowship tracks.",
-      inputSchema: { chain },
-      outputSchema: {
-        tracks: z.array(
-          z.object({
-            id: z.number().int().nonnegative().describe("Governance track ID"),
-            name: z.string().describe("Governance track name"),
-            activeCount: z
-              .number()
-              .int()
-              .nonnegative()
-              .nullable()
-              .describe(
-                "Number of active referenda on this track, or null when unavailable",
-              ),
-            url: z
-              .string()
-              .url()
-              .describe("SubSquare page for this governance track"),
-          }),
-        ),
-      },
-      annotations: readOnlyAnnotations,
-    },
-    async (args) => createStructuredJsonResult(await listTracks(args)),
   );
 
   registerOpenGovTrackTools(server);

@@ -3,17 +3,18 @@ import { chains } from "../../config/chain.js";
 import { getChainConfig } from "../../config/chains.js";
 import { requirePaginatedResponse } from "../../utils/pagination.js";
 import { ApiRequestError, request } from "../api.js";
+import { createTreasuryPostUrl } from "./common.js";
 
 export const TREASURY_BENEFIT_CHAINS = [chains.polkadot, chains.kusama];
 
-const BENEFIT_MODULE_PATHS = {
-  treasury_spends: "treasury-spends",
-  treasury_proposals: "treasury-proposals",
-  tips: "tips",
-  bounties: "bounties",
-  child_bounties: "child-bounties",
+const BENEFIT_MODULES = {
+  treasury_spends: { path: "treasury-spends", postType: "treasurySpend" },
+  treasury_proposals: { path: "treasury-proposals", postType: "treasuryProposal" },
+  tips: { path: "tips", postType: "tip" },
+  bounties: { path: "bounties", postType: "bounty" },
+  child_bounties: { path: "child-bounties", postType: "childBounty" },
 };
-export const TREASURY_BENEFIT_MODULES = Object.keys(BENEFIT_MODULE_PATHS);
+export const TREASURY_BENEFIT_MODULES = Object.keys(BENEFIT_MODULES);
 
 const BENEFIT_ITEM_FIELDS = [
   "title",
@@ -30,37 +31,11 @@ const BENEFIT_ITEM_FIELDS = [
   "createdAt",
 ];
 
-function createBenefitItemUrl(moduleName, item, siteUrl) {
-  const build = (path) => new URL(path, siteUrl).toString();
-
-  if (moduleName === "treasury_spends" && item.index != null) {
-    return build(`treasury/spends/${item.index}`);
-  }
-  if (moduleName === "treasury_proposals" && item.proposalIndex != null) {
-    return build(`treasury/proposal/${item.proposalIndex}`);
-  }
-  if (moduleName === "bounties" && item.bountyIndex != null) {
-    return build(`treasury/bounty/${item.bountyIndex}`);
-  }
-  if (
-    moduleName === "child_bounties" &&
-    item.parentBountyId != null &&
-    item.index != null
-  ) {
-    return build(`treasury/child-bounty/${item.parentBountyId}_${item.index}`);
-  }
-  if (moduleName === "tips" && item.height != null && item.hash) {
-    return build(`treasury/tips/${item.height}_${item.hash}`);
-  }
-
-  return null;
-}
-
-function compactBenefitItem(moduleName, item, siteUrl) {
+function compactBenefitItem(postType, item, chain) {
   return {
     ...pick(item, BENEFIT_ITEM_FIELDS),
     state: item.state?.state ?? item.state ?? null,
-    url: createBenefitItemUrl(moduleName, item, siteUrl),
+    url: createTreasuryPostUrl(postType, item, chain),
   };
 }
 
@@ -121,8 +96,8 @@ export async function listTreasuryBeneficiaries({
 }
 
 async function fetchBenefitModule({ chain, address, moduleName, page, pageSize }) {
-  const { apiUrl, siteUrl } = getChainConfig(chain);
-  const path = BENEFIT_MODULE_PATHS[moduleName];
+  const { apiUrl } = getChainConfig(chain);
+  const { path, postType } = BENEFIT_MODULES[moduleName];
   const endpoint = new URL(
     `beneficiaries/${encodeURIComponent(address)}/${path}`,
     apiUrl,
@@ -140,7 +115,7 @@ async function fetchBenefitModule({ chain, address, moduleName, page, pageSize }
       page: response.page,
       pageSize: response.pageSize,
       total: response.total,
-      items: response.items.map((item) => compactBenefitItem(moduleName, item, siteUrl)),
+      items: response.items.map((item) => compactBenefitItem(postType, item, chain)),
       source: endpoint.toString(),
     };
   } catch (error) {
