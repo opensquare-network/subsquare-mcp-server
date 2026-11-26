@@ -27,15 +27,17 @@ function compactSummaryEvent(item) {
 
 function compactEvent(item) {
   const { proposal, ...data } = item.data ?? {};
+  const type = String(item.type ?? "");
+  const isReferendum = type.startsWith("referenda_") || type.startsWith("fellowship_");
 
   return {
     ...compactSummaryEvent(item),
     eventIndex: item.indexer?.eventIndex ?? null,
-    referendumIndex: item.referendumIndex ?? null,
+    referendumIndex: item.referendumIndex ?? (isReferendum ? item.index : null) ?? null,
     bountyIndex: item.bountyIndex ?? null,
     childBountyIndex: item.childBountyIndex ?? null,
     proposalIndex: item.proposalIndex ?? null,
-    tipHash: item.tipHash ?? null,
+    tipHash: item.tipHash ?? (type.startsWith("treasury_tip_") ? item.hash : null) ?? null,
     postTitle: data.postTitle ?? null,
     data,
     proposal: proposal ?? null,

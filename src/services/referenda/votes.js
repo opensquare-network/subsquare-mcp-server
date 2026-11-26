@@ -61,6 +61,11 @@ function createVoteSummary(votes) {
   const convictionCounts = {};
 
   for (const vote of votes) {
+    if (vote.conviction != null) {
+      convictionCounts[vote.conviction] =
+        (convictionCounts[vote.conviction] ?? 0) + 1;
+    }
+
     if (vote.isDelegating) {
       delegating += 1;
       continue;
@@ -81,11 +86,6 @@ function createVoteSummary(votes) {
       aye += 1;
     } else if (side === false) {
       nay += 1;
-    }
-
-    if (vote.conviction != null) {
-      convictionCounts[vote.conviction] =
-        (convictionCounts[vote.conviction] ?? 0) + 1;
     }
   }
 
@@ -168,7 +168,7 @@ export async function listReferendumVotes({
     summary: createVoteSummary(sortedVotes),
     ...statsResult,
     tallyHistory: includeTallyHistory
-      ? compactTallyHistory(tallyResponse, tallyLimit)
+      ? compactTallyHistory(tallyResponse, tallyLimit, referendumType)
       : null,
     identities,
     items,
@@ -229,12 +229,15 @@ function toDecimalString(value) {
   return String(value);
 }
 
-function compactTallyItem(item) {
+function compactTallyItem(item, referendumType) {
   const tally = item?.tally ?? {};
+  const isFellowship = referendumType === "fellowship";
   const ayes = toDecimalString(tally.ayes);
   const nays = toDecimalString(tally.nays);
-  const support = toDecimalString(tally.support);
-  const electorate = toDecimalString(tally.issuance ?? tally.electorate);
+  const support = toDecimalString(isFellowship ? tally.bareAyes : tally.support);
+  const electorate = toDecimalString(
+    isFellowship ? tally.maxVoters : tally.issuance ?? tally.electorate,
+  );
 
   return {
     blockHeight: item?.indexer?.blockHeight ?? null,
@@ -245,12 +248,12 @@ function compactTallyItem(item) {
     electorate,
     approvalPercent: getApprovalPercent(ayes, nays),
     supportPercent: toPercent(support, electorate),
-    turnoutPercent: toPercent(tally.totalCapital, electorate),
+    turnoutPercent: isFellowship ? null : toPercent(tally.totalCapital, electorate),
   };
 }
 
-function compactTallyHistory(items, limit) {
-  const normalized = items.map(compactTallyItem);
+function compactTallyHistory(items, limit, referendumType) {
+  const normalized = items.map((item) => compactTallyItem(item, referendumType));
   const trimmed = normalized.slice(-Math.max(limit, 1));
 
   return {

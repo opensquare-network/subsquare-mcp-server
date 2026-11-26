@@ -27,7 +27,9 @@ const voteSummarySchema = z.object({
   delegating: z.number().int().nonnegative(),
   totalBalance: z.string().nullable(),
   totalVotes: z.string(),
-  convictionCounts: z.record(z.string(), z.number().int().nonnegative()),
+  convictionCounts: z
+    .record(z.string(), z.number().int().nonnegative())
+    .describe("Counts per conviction across all vote records, including delegations and split votes"),
 });
 
 const voteStatsSchema = z.object({
@@ -51,11 +53,11 @@ const tallyItemSchema = z.object({
   blockTime: z.number().nullable(),
   ayes: z.string().nullable(),
   nays: z.string().nullable(),
-  support: z.string().nullable(),
-  electorate: z.string().nullable(),
+  support: z.string().nullable().describe("OpenGov support in chain base units, or the Fellowship bare aye count"),
+  electorate: z.string().nullable().describe("Recorded issuance for OpenGov, or the maximum eligible voter count for Fellowship"),
   approvalPercent: z.number().nullable(),
   supportPercent: z.number().nullable(),
-  turnoutPercent: z.number().nullable().describe("Null when the tally does not provide total voting capital"),
+  turnoutPercent: z.number().nullable().describe("Null for Fellowship or when total voting capital is unavailable"),
 });
 
 const votesOutputSchema = paginatedItemsSchema.extend({

@@ -6,11 +6,12 @@ const DEFAULT_TURNOUT_LIMIT = 20;
 
 function getTrackStatistics(track) {
   const statistics = track?.statistics ?? {};
+  const { capital, votes } = statistics.votes ?? {};
   return {
     delegatorCount: statistics.addresses?.delegator ?? null,
     delegateeCount: statistics.addresses?.delegatee ?? null,
-    delegatedCapital: statistics.votes?.capital ?? null,
-    delegatedVotes: statistics.votes?.votes ?? null,
+    delegatedCapital: typeof capital === "number" ? String(capital) : capital ?? null,
+    delegatedVotes: typeof votes === "number" ? String(votes) : votes ?? null,
   };
 }
 

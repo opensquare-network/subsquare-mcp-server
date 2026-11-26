@@ -57,7 +57,7 @@ export function registerEventTools(server) {
           .min(1)
           .optional()
           .describe(
-            "Filter by event type substring, for example referenda_approved",
+            "Filter by event type substring, for example referenda_confirmed",
           ),
         limit: z
           .number()

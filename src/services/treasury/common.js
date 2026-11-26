@@ -41,11 +41,7 @@ function getChildBountyId(item) {
 }
 
 function getTipId({ height, hash }) {
-  if (!hash) {
-    return null;
-  }
-
-  return height == null ? hash : `${height}_${hash}`;
+  return height == null || !hash ? null : `${height}_${hash}`;
 }
 
 export function createTreasuryUrl(path, chain) {

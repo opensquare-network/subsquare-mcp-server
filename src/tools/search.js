@@ -7,8 +7,11 @@ import { createStructuredJsonResult, readOnlyAnnotations } from "./common.js";
 const searchText = z
   .string()
   .trim()
-  .min(3)
-  .describe("Keyword or phrase to search for (at least 3 characters)");
+  .min(1)
+  .refine((text) => text.length >= 3 || /^\d+$/.test(text), {
+    message: "Search text must be at least 3 characters or a numeric ID",
+  })
+  .describe("Text to search for (at least 3 characters unless it is a numeric ID)");
 
 const searchMax = z
   .number()
@@ -23,7 +26,7 @@ export function registerSearchTools(server) {
     "gov_search",
     {
       description:
-        "Search Subsquare governance content. mode=keyword matches text across modules such as referenda, treasury, and Fellowship, with results grouped by module. mode=full_text searches posts and comments with highlighted snippets on Polkadot. Results include detail links or comment permalinks where available. Projects and Wiki articles are included where available.",
+        "Search Subsquare governance content. mode=keyword matches text across modules such as referenda, treasury, and Fellowship, with results grouped by module. mode=full_text searches posts and comments with highlighted snippets on Polkadot. Results include detail links or comment permalinks where available. Tip links require the tip's block height as well as its hash. Projects and Wiki articles are included where available.",
       inputSchema: z.object({
         chain: z
           .enum(subsquareApiChains)

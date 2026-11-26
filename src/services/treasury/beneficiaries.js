@@ -1,11 +1,16 @@
 import pick from "lodash/pick.js";
+import { AccountId, getSs58AddressInfo } from "polkadot-api";
 import { chains } from "../../config/chain.js";
 import { getChainConfig } from "../../config/chains.js";
 import { requirePaginatedResponse } from "../../utils/pagination.js";
 import { ApiRequestError, request } from "../api.js";
 import { createTreasuryPostUrl } from "./common.js";
 
-export const TREASURY_BENEFIT_CHAINS = [chains.polkadot, chains.kusama];
+const beneficiarySs58Formats = {
+  [chains.polkadot]: 0,
+  [chains.kusama]: 2,
+};
+export const TREASURY_BENEFIT_CHAINS = Object.keys(beneficiarySs58Formats);
 
 const BENEFIT_MODULES = {
   treasury_spends: { path: "treasury-spends", postType: "treasurySpend" },
@@ -169,12 +174,18 @@ export async function getAddressTreasuryBenefits({
   page = 1,
   page_size: pageSize = 25,
 } = {}) {
+  const addressInfo = getSs58AddressInfo(address);
+  if (!addressInfo.isValid) {
+    throw new Error("[invalid_address] address must be a valid SS58 account address");
+  }
+
+  const normalizedAddress = AccountId(beneficiarySs58Formats[chain]).dec(addressInfo.publicKey);
   const moduleNames = [...new Set(modules)];
 
   const [summaryResponse, ...moduleResponses] = await Promise.all([
-    fetchBeneficiarySummary({ chain, address }),
+    fetchBeneficiarySummary({ chain, address: normalizedAddress }),
     ...moduleNames.map((moduleName) =>
-      fetchBenefitModule({ chain, address, moduleName, page, pageSize }),
+      fetchBenefitModule({ chain, address: normalizedAddress, moduleName, page, pageSize }),
     ),
   ]);
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { EnvHttpProxyAgent, MockAgent } from "undici";
 import { createMcpServer } from "../src/mcp.js";
 import { ApiRequestError, request } from "../src/services/api.js";
 import { listMultiAssetChildBounties } from "../src/services/treasury/bounties.js";
@@ -572,6 +573,8 @@ test("governance search routes both modes and rejects non-Polkadot full-text sea
   let fullText = {
     items: [
       { type: "referendaReferendum", referendumIndex: 0, title: "Budget", content: "Account funding" },
+      { type: "tip", hash, height: 10836248, title: "Budget tip" },
+      { type: "tip", hash, height: 10836269, title: "Budget tip" },
       { type: "tip", hash, title: "Budget tip" },
       { type: "comment", postType: "tip", hash, height: 7, content: "Tip comment" },
       {
@@ -615,11 +618,14 @@ test("governance search routes both modes and rejects non-Polkadot full-text sea
   const args = { chain: "polkadot", mode: "full_text", text: "Budget", max: 4 };
   const result = await client.callTool({ name: "gov_search", arguments: args });
   assert.ok(!result.isError, result.content[0]?.text);
-  const [referendum, tip, comment, childBounty] = result.structuredContent.items;
+  const [referendum, firstTip, secondTip, hashOnlyTip, comment, childBounty] =
+    result.structuredContent.items;
   assert.equal(referendum.content, "Account funding");
-  assert.equal(tip.url, `https://polkadot.subsquare.io/treasury/tips/${hash}`);
+  assert.equal(firstTip.url, `https://polkadot.subsquare.io/treasury/tips/10836248_${hash}`);
+  assert.equal(secondTip.url, `https://polkadot.subsquare.io/treasury/tips/10836269_${hash}`);
+  assert.equal(hashOnlyTip.url, null);
   assert.equal(comment.height, 7);
-  assert.equal(comment.url, `https://polkadot.subsquare.io/treasury/tips/${hash}#7`);
+  assert.equal(comment.url, null);
   assert.equal(childBounty.url, "https://polkadot.subsquare.io/treasury/child-bounties/2_0_123");
   assert.deepEqual(result.structuredContent.projects, [{ id: "nova", name: "Nova" }]);
   assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
@@ -627,20 +633,48 @@ test("governance search routes both modes and rejects non-Polkadot full-text sea
   await expectToolError(client, "gov_search", args, /\[invalid_upstream_response\].*items/);
 });
 
+test("keyword search accepts short numeric IDs but not short keywords", async (t) => {
+  const get = t.mock.method(request, "get", async (url, query) => {
+    assert.equal(url.pathname, "/search");
+    const referendumIndex = Number(query.text);
+    return {
+      openGovReferenda: [{ referendumIndex }],
+      democracyReferenda: [{ referendumIndex }],
+    };
+  });
+  const client = await connect(t);
+  const args = { chain: "polkadot" };
+  await expectToolError(client, "gov_search", { ...args, text: "ab" }, /Input validation error.*text/);
+  assert.equal(get.mock.callCount(), 0);
+
+  for (const index of [0, 42]) {
+    const search = await call(client, "gov_search", { ...args, text: ` ${index} ` });
+    assert.equal(search.query, String(index));
+    assert.equal(search.results.openGovReferenda[0].referendumIndex, index);
+    assert.equal(search.results.democracyReferenda[0].referendumIndex, index);
+  }
+});
+
 test("referendum vote type selects the route independently of the chain", async (t) => {
   const electorate = "100000000000000000000";
   const totalCapital = "1000000000000000000";
   let tally = [
     { indexer: { blockHeight: 1 }, tally: { ayes: "0x2", nays: "0x2" } },
-    { indexer: { blockHeight: 2 }, tally: { ayes: "0x3", nays: "0x1" } },
+    {
+      indexer: { blockHeight: 2 },
+      tally: { ayes: "0x3", nays: "0x1", bareAyes: 3, maxVoters: 12 },
+    },
   ];
   const get = t.mock.method(request, "get", async (url) => {
     assert.equal(url.hostname, "kusama-api.subsquare.io");
     switch (url.pathname) {
       case "/gov2/referenda/0/votes":
         return [
-          { account: "low", aye: false, balance: "4", votes: "4" },
-          { account: "high", aye: true, balance: "90071992547409930", votes: "90071992547409930" },
+          { account: "low", aye: false, balance: "4", votes: "4", conviction: 1 },
+          { account: "high", aye: true, balance: "90071992547409930", votes: "90071992547409930", conviction: 1 },
+          { account: "delegator", isDelegating: true, balance: "1", votes: "6", conviction: 6 },
+          { account: "split", isSplit: true, balance: "20", votes: "2", conviction: 0 },
+          { account: "abstain", isSplitAbstain: true, balance: "30", votes: "3", conviction: 0 },
         ];
       case "/gov2/referendums/0/vote-stats":
         return { electorate, totalCapital, percentage: 0.01 };
@@ -671,8 +705,9 @@ test("referendum vote type selects the route independently of the chain", async 
     ...args, include_tally_history: true,
   });
   assert.deepEqual(opengov.items.map(({ account }) => account), ["high"]);
-  assert.equal(opengov.total, 2);
-  assert.equal(opengov.summary.totalVotes, "90071992547409934");
+  assert.equal(opengov.total, 5);
+  assert.equal(opengov.summary.totalVotes, "90071992547409945");
+  assert.deepEqual(opengov.summary.convictionCounts, { 0: 2, 1: 2, 6: 1 });
   assert.equal(opengov.stats.electorate, electorate);
   assert.equal(opengov.stats.totalCapital, totalCapital);
   assert.equal(opengov.stats.turnoutRatio, 0.01);
@@ -692,8 +727,10 @@ test("referendum vote type selects the route independently of the chain", async 
   assert.equal(fellowship.statsStatus, "unsupported");
   assert.equal(fellowship.summary.aye, 1);
   assert.equal(fellowship.tallyHistory.total, 2);
-  assert.deepEqual(fellowship.tallyHistory.items.map(({ blockHeight, ayes, approvalPercent }) =>
-    [blockHeight, ayes, approvalPercent]), [[2, "3", 75]]);
+  assert.deepEqual(fellowship.tallyHistory.items, [{
+    blockHeight: 2, blockTime: null, ayes: "3", nays: "1", support: "3", electorate: "12",
+    approvalPercent: 75, supportPercent: 25, turnoutPercent: null,
+  }]);
 
   tally = null;
   await expectToolError(
@@ -701,18 +738,26 @@ test("referendum vote type selects the route independently of the chain", async 
   );
 });
 
-test("OpenGov turnout statistics can be skipped and HTTP errors do not hide votes", async (t) => {
+test("OpenGov turnout statistics can be skipped and unavailable stats do not hide votes", async (t) => {
   const votesPath = "/gov2/referenda/0/votes";
   const statsPath = "/gov2/referendums/0/vote-stats";
   const vote = { account: address, aye: true, votes: "3" };
-  const get = t.mock.method(request, "get", async (url) => {
-    if (url.pathname === votesPath) {
-      return [vote];
-    }
+  const agent = new MockAgent();
+  agent.disableNetConnect();
+  t.after(() => agent.close());
+  const dispatch = t.mock.method(EnvHttpProxyAgent.prototype, "dispatch", agent.dispatch.bind(agent));
+  const upstream = agent.get("https://kusama-api.subsquare.io");
+  upstream.intercept({ path: votesPath }).reply(200, [vote]).persist();
+  upstream.intercept({ path: statsPath }).reply(503, "Fixture turnout statistics unavailable");
+  upstream.intercept({ path: statsPath }).replyWithError(
+    Object.assign(new Error("Fixture connection reset"), { code: "ECONNRESET" }),
+  );
+  upstream.intercept({ path: statsPath }).replyWithError(
+    new DOMException("Fixture request timed out", "TimeoutError"),
+  );
+  upstream.intercept({ path: statsPath }).reply(200, []);
+  upstream.intercept({ path: statsPath }).reply(200, "{");
 
-    assert.equal(url.pathname, statsPath);
-    throw new ApiRequestError("Fixture turnout statistics unavailable", { status: 503 });
-  });
   const warn = t.mock.method(console, "warn", () => {});
   const client = await connect(t);
   const args = { chain: "kusama", referendum_type: "opengov", referendum_index: 0 };
@@ -722,31 +767,41 @@ test("OpenGov turnout statistics can be skipped and HTTP errors do not hide vote
     { ...args, referendum_type: "fellowship", include_stats: false },
     /\[unsupported_filter\].*include_stats.*fellowship/,
   );
-  assert.equal(get.mock.callCount(), 0);
+  assert.equal(dispatch.mock.callCount(), 0);
 
   const skipped = await call(client, "list_referendum_votes", { ...args, include_stats: false });
   assert.equal(skipped.stats, null);
   assert.equal(skipped.statsStatus, "not_requested");
   assert.deepEqual(skipped.items, [vote]);
 
-  const unavailable = await call(client, "list_referendum_votes", args);
-  assert.equal(unavailable.stats, null);
-  assert.equal(unavailable.statsStatus, "unavailable");
-  assert.deepEqual(unavailable.items, [vote]);
-  assert.deepEqual(
-    get.mock.calls.map(({ arguments: [url] }) => url.pathname),
-    [votesPath, votesPath, statsPath],
+  for (const failure of [/status 503/, /connection reset/, /timed out/]) {
+    const unavailable = await call(client, "list_referendum_votes", args);
+    assert.equal(unavailable.stats, null);
+    assert.equal(unavailable.statsStatus, "unavailable");
+    assert.deepEqual(unavailable.items, [vote]);
+    assert.match(warn.mock.calls.at(-1).arguments[1], failure);
+  }
+  await expectToolError(
+    client, "list_referendum_votes", args, /\[invalid_upstream_response\].*vote statistics/,
   );
-  assert.equal(warn.mock.callCount(), 1);
+  await expectToolError(client, "list_referendum_votes", args, /JSON/);
+  assert.equal(warn.mock.callCount(), 3);
 });
 
-test("beneficiary activity validates each requested page rather than fabricating empty results", async (t) => {
+test("beneficiary activity normalizes SS58 addresses and validates requested pages", async (t) => {
+  const beneficiaryAddresses = {
+    "polkadot-api.subsquare.io": "12KM5KYi2fBdRoijHVrpPx71buoU5bG8Yq7rVpEG7nrUG6f",
+    "kusama-api.subsquare.io": "Cbds4QMUcQdwYceYMFuaCUxJaCPaSrJWRwP5s6qBpyq34Sg",
+  };
+  const genericAddress = "5C62Ck4UrFPiBtoCmeSrgF7x9yv9mn38446dhCpsi2mLHiFT";
   let spends = { page: 2, pageSize: 1, items: [] };
-  t.mock.method(request, "get", async (url, query) => {
+  const get = t.mock.method(request, "get", async (url, query) => {
+    const beneficiary = beneficiaryAddresses[url.hostname];
+    assert.ok(beneficiary);
     switch (url.pathname) {
-      case `/treasury/beneficiaries/${address}`:
-        return { address, spends: { benefitCount: 2 } };
-      case `/beneficiaries/${address}/treasury-spends`:
+      case `/treasury/beneficiaries/${beneficiary}`:
+        return { address: beneficiary, spends: { benefitCount: 2 } };
+      case `/beneficiaries/${beneficiary}/treasury-spends`:
         assert.deepEqual(query, { page: 2, page_size: 1 });
         if (spends instanceof ApiRequestError) {
           throw spends;
@@ -758,19 +813,31 @@ test("beneficiary activity validates each requested page rather than fabricating
   });
   const client = await connect(t);
   const args = {
-    chain: "polkadot", address, modules: ["treasury_spends"], page: 2, page_size: 1,
+    chain: "polkadot", address: genericAddress, modules: ["treasury_spends"], page: 2, page_size: 1,
   };
+  await expectToolError(
+    client, "get_address_treasury_benefits", { ...args, address }, /\[invalid_address\].*SS58/,
+  );
+  assert.equal(get.mock.callCount(), 0);
   await expectToolError(
     client, "get_address_treasury_benefits", args, /\[invalid_upstream_response\].*total:/,
   );
   spends = { ...spends, total: 2, items: [{ index: 4, title: "Spend" }] };
-  const benefits = await call(client, "get_address_treasury_benefits", args);
-  assert.equal(benefits.summary.spends.benefitCount, 2);
-  assert.equal(benefits.modules[0].items[0].url, "https://polkadot.subsquare.io/treasury/spends/4");
+  const outputs = {};
+  for (const chain of ["polkadot", "kusama"]) {
+    const benefits = await call(client, "get_address_treasury_benefits", { ...args, chain });
+    assert.equal(benefits.address, genericAddress);
+    assert.equal(benefits.isBeneficiary, true);
+    assert.equal(benefits.summary.address, beneficiaryAddresses[`${chain}-api.subsquare.io`]);
+    assert.equal(benefits.summary.spends.benefitCount, 2);
+    assert.equal(benefits.modules[0].items[0].url, `https://${chain}.subsquare.io/treasury/spends/4`);
+    outputs[chain] = benefits;
+  }
 
+  const beneficiary = beneficiaryAddresses["polkadot-api.subsquare.io"];
   spends = new ApiRequestError("Fixture beneficiary spends unavailable", { status: 404 });
-  const unavailable = await call(client, "get_address_treasury_benefits", args);
-  assert.deepEqual(unavailable.summary, benefits.summary);
+  const unavailable = await call(client, "get_address_treasury_benefits", { ...args, address: beneficiary });
+  assert.deepEqual(unavailable.summary, outputs.polkadot.summary);
   assert.deepEqual(unavailable.modules[0], {
     module: "treasury_spends",
     supported: false,
@@ -778,7 +845,7 @@ test("beneficiary activity validates each requested page rather than fabricating
     pageSize: null,
     total: null,
     items: null,
-    source: `https://polkadot-api.subsquare.io/beneficiaries/${address}/treasury-spends`,
+    source: `https://polkadot-api.subsquare.io/beneficiaries/${beneficiary}/treasury-spends`,
     error: "Fixture beneficiary spends unavailable",
   });
 });
@@ -830,7 +897,10 @@ test("track views fetch only their own upstream records and preserve the default
           delegation: {},
         };
       case "/referenda/tracks":
-        return [{ trackId: 0, statistics: { votes: { capital: "42" } } }];
+        return [
+          { trackId: 0, statistics: { votes: { capital: "90071992547409934" } } },
+          { trackId: 1, statistics: { votes: { capital: 0, votes: 0 } } },
+        ];
       case "/referenda/tracks/0/turnout":
         return [{ referendumIndex: 2 }, { referendumIndex: 3, ayes: "2", nays: "1" }];
       default:
@@ -855,9 +925,9 @@ test("track views fetch only their own upstream records and preserve the default
   const stats = await call(client, "opengov_list_tracks", { chain, view: "statistics" });
   assert.equal(stats.delegation, null);
   assert.deepEqual(
-    stats.tracks.map(({ trackId, turnoutPercent, referendaCount, delegatedCapital }) =>
-      [trackId, turnoutPercent, referendaCount, delegatedCapital]),
-    [[0, 20, 10, "42"]],
+    stats.tracks.map(({ trackId, turnoutPercent, referendaCount, delegatedCapital, delegatedVotes }) =>
+      [trackId, turnoutPercent, referendaCount, delegatedCapital, delegatedVotes]),
+    [[0, 20, 10, "90071992547409934", null], [1, null, null, "0", "0"]],
   );
   const turnout = await call(client, "opengov_get_track_turnout", { chain, track_id: 0, limit: 1 });
   assert.equal(turnout.total, 2);
@@ -901,10 +971,13 @@ test("governance event windows are inclusive and invalid timestamps fail before 
   const get = t.mock.method(request, "get", async (url, query) => {
     assert.equal(url.pathname, "/events/summary");
     assert.deepEqual(query, { begin_time: time, end_time: time });
-    return [{ type: "referenda_approved", category: "OpenGov", indexer: { blockTime: time } }];
+    return [{ type: "referenda_confirmed", category: "OpenGov", indexer: { blockTime: time } }];
   });
   const client = await connect(t);
-  const args = { chain: "polkadot", begin_time: "2026-11-01T00:00:00Z", end_time: time };
+  const args = {
+    chain: "polkadot", begin_time: "2026-11-01T00:00:00Z", end_time: time,
+    type: "referenda_confirmed",
+  };
   await expectToolError(
     client, "list_gov_events", { ...args, end_time: 8_640_000_000_000_001 }, /\[invalid_time\].*end_time/,
   );
@@ -912,4 +985,27 @@ test("governance event windows are inclusive and invalid timestamps fail before 
   const events = await call(client, "list_gov_events", args);
   assert.deepEqual(events.items.map(({ blockTime }) => blockTime), [time]);
   assert.equal(events.truncated, false);
+});
+
+test("governance event details use the identifiers for each upstream event type", async (t) => {
+  const hash = `0x${"a".repeat(64)}`;
+  const blockTime = Date.parse("2025-11-01T00:03:18Z");
+  t.mock.method(request, "get", async (url) => {
+    assert.equal(url.pathname, "/events");
+    return [
+      { type: "referenda_confirmed", category: "OpenGov", index: 1777, indexer: { blockTime } },
+      { type: "fellowship_submitted", category: "OpenGov", index: 0, indexer: { blockTime } },
+      { type: "treasury_tip_closed", category: "Treasury", hash, indexer: { blockTime } },
+      { type: "democracy_passed", category: "Democracy", referendumIndex: 8, indexer: { blockTime } },
+      { type: "treasury_spend_approved", index: 4, hash, indexer: { blockTime } },
+    ];
+  });
+  const client = await connect(t);
+  const events = await call(client, "list_gov_events", {
+    chain: "polkadot", begin_time: blockTime, end_time: blockTime, summary: false,
+  });
+  assert.deepEqual(
+    events.items.map(({ referendumIndex, tipHash }) => [referendumIndex, tipHash]),
+    [[1777, null], [0, null], [null, hash], [8, null], [null, null]],
+  );
 });
