@@ -1,6 +1,17 @@
 import { getStateScanConfig } from "../../config/chains.js";
 import { formatAmount } from "../../utils/amount.js";
+import {
+  paginatedItemsSchema,
+  requirePaginatedResponse,
+  zeroBasedPaginatedItemsSchema,
+} from "../../utils/pagination.js";
 import { request } from "../api.js";
+
+const assetHoldersPageSchema = paginatedItemsSchema.pick({ total: true }).extend({
+  holders: paginatedItemsSchema.shape.items,
+  limit: paginatedItemsSchema.shape.pageSize,
+  offset: zeroBasedPaginatedItemsSchema.shape.page,
+});
 
 // pallet-assets and pallet-foreign-assets expose the same detail and metadata
 // fields, so both queries share one selection string.
@@ -109,14 +120,15 @@ async function queryAccountAssets({
     query,
     variables: { address, limit, offset },
   });
-  if (response.errors?.length) {
+  if (response?.errors?.length) {
     throw new Error(response.errors.map(({ message }) => message).join("; "));
   }
 
-  const result = response.data?.[field];
-  if (result == null) {
-    throw new Error(`${field} was not returned for ${address} on ${chain}`);
-  }
+  const result = requirePaginatedResponse(
+    response?.data?.[field],
+    `StateScan ${field}`,
+    assetHoldersPageSchema,
+  );
 
   return {
     chain,
@@ -124,7 +136,7 @@ async function queryAccountAssets({
     limit: result.limit,
     offset: result.offset,
     total: result.total,
-    items: (result.holders ?? []).map((holder) => ({
+    items: result.holders.map((holder) => ({
       ...holder,
       formatted: formatHolderBalance(holder.balance, holder.asset?.metadata),
     })),

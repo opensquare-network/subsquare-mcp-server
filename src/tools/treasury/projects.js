@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getTreasuryProjectDetail } from "../../services/treasury/index.js";
-import { createJsonResult, readOnlyAnnotations } from "../common.js";
+import { createStructuredJsonResult, readOnlyAnnotations } from "../common.js";
 
 const projectId = z
   .string()
@@ -8,8 +8,14 @@ const projectId = z
   .min(1)
   .max(100)
   .describe(
-    "Exact Polkadot Treasury project ID returned by treasury_list_projects, for example 'nova'",
+    "Exact project ID returned by treasury_list with chain=polkadot and kind=projects, for example 'nova'",
   );
+
+export const treasuryProjectSummarySchema = z
+  .object({ id: z.string().describe("Exact Polkadot Treasury project ID") })
+  .passthrough();
+
+const linkedRecords = z.array(z.object({}).passthrough());
 
 export const treasuryProjectDetailInputSchema = {
   project_id: projectId,
@@ -20,13 +26,19 @@ export function registerTreasuryProjectTools(server) {
     "treasury_get_project_detail",
     {
       description:
-        "Get one Polkadot Treasury project with its compact linked proposal, spend, tip, bounty, and child bounty details.",
+        "Get one Polkadot Treasury project with its compact linked proposals, spends, tips, native and Multi-Asset Bounties, and child bounties.",
       inputSchema: treasuryProjectDetailInputSchema,
+      outputSchema: treasuryProjectSummarySchema.extend({
+        proposals: linkedRecords,
+        spends: linkedRecords,
+        tips: linkedRecords,
+        bounties: linkedRecords,
+        childBounties: linkedRecords,
+        multiAssetBounties: linkedRecords,
+      }),
       annotations: readOnlyAnnotations,
     },
-    async (args) => {
-      const result = await getTreasuryProjectDetail(args);
-      return createJsonResult(result);
-    },
+    async (args) =>
+      createStructuredJsonResult(await getTreasuryProjectDetail(args)),
   );
 }

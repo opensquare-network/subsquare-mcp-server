@@ -1,124 +1,97 @@
 # MCP Tools
 
-The server exposes **71 read-only tools** through the `/mcp` endpoint.
+The server exposes **38 read-only tools**. Related records are often grouped in one tool
+and selected with an enum argument (`kind`, `view`, `bounty_type`, or `referendum_type`).
+Dedicated statistics tools do not load the related lists, profiles, or details.
 
-## Posts
+Conventions:
 
-| Tool | Description | Chains |
+- All tools are read-only. Most paginated lists take `page` / `page_size` starting at page 1.
+  `block_list` and account extrinsics/transfers start at page 0. Account assets and Coretime
+  list queries take `limit` / `offset`; Vesting accounts take `limit` / `cursor`.
+- Paginated Treasury, bounty, Fellowship feed/application, and StateScan queries return
+  an error for incomplete upstream pages. A valid page can be empty, and StateScan block
+  lists do not require a `total`.
+- `chain` accepts only the chains listed for the tool; unsupported combinations fail fast
+  with an actionable error.
+- Arguments that do not apply to the selected record type are rejected with an actionable
+  error instead of being silently ignored.
+- JSON payloads are returned in `structuredContent` and mirrored as text in `content`.
+
+## OpenGov
+
+| Tool | Enum | Description | Chains |
+| --- | --- | --- | --- |
+| `opengov_list_referenda` | — | List and filter referenda, or use `proposer` to list one user's referenda (not on Collectives). Set `include_summary: true` for chain-wide state counts, cached for one minute. `summaryStatus` is `available`, `not_requested`, or `unavailable`. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `opengov_referenda_summary` | — | Get chain-wide state counts without fetching a referendum list. Shares the one-minute cache with `opengov_list_referenda`. On Collectives, returns Fellowship counts. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `opengov_referendum_detail` | — | Get one referendum's full details. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `opengov_list_tracks` | — | List track IDs, names, active referendum counts, and detail URLs. Collectives returns Fellowship tracks. | Polkadot, Kusama, Hydration, Polkadot Collectives |
+| `list_referendum_comments` | `referendum_type` = `opengov` \| `fellowship` \| `ambassador` | List referendum comments with reactions and nested replies. Use `page_size` and `include_polkassembly` (set to `false` to exclude Polkassembly comments); legacy `pageSize` and `includePolkassembly` are rejected. | OpenGov: Polkadot, Kusama, Hydration. Fellowship: Polkadot Collectives, Kusama. Ambassador: Polkadot Collectives |
+| `opengov_list_delegations` | `view` = `delegates` \| `delegators` \| `track` | List delegates with statistics, one delegate's delegators (`address`), or delegation relationships for one `track_id`. `page_size` defaults to 100 for `delegators`, 25 for the other views. | Polkadot, Kusama, Hydration |
+
+## Democracy, Council, and Technical Committee
+
+| Tool | Enum | Description | Chains |
+| --- | --- | --- | --- |
+| `democracy_list` | `kind` = `referendums` \| `proposals` \| `externals` | List legacy Democracy referendums, public proposals, or external proposals. | Polkadot, Kusama, Hydration |
+| `committee_list` | `kind` = `council_motions` \| `techcomm_proposals` | List Council motions or Technical Committee proposals with compact fields and detail URLs. | Polkadot, Kusama, Hydration |
+| `techcomm_list_members` | — | Query current Technical Committee member addresses from chain storage (unpaginated). | Hydration |
+
+## Treasury and Bounties
+
+| Tool | Enum | Description | Chains |
+| --- | --- | --- | --- |
+| `treasury_list` | `kind` = `projects` \| `tips` \| `proposals` \| `spends` | Return compact project metadata (unpaginated) or paginated tips, proposals, or spends. Use `treasury_get_project_detail` for a project's linked funding records. | Projects: Polkadot. Tips, proposals, spends: Polkadot, Kusama, Hydration |
+| `treasury_get` | `view` = `status` \| `burn` | Summarize Treasury activity counts, or get cumulative burns with paginated records and optional history. Pagination and `include_history` apply only to `view=burn`. | Polkadot, Kusama, Hydration |
+| `treasury_get_balances` | — | Get Treasury balances reported by DotTreasury for one chain or every reported chain. | Polkadot, Kusama, Hydration, Acala, Karura, Bifrost, Astar |
+| `treasury_get_project_detail` | — | Get one Polkadot Treasury project with its linked proposals, spends, tips, bounties, and child bounties. | Polkadot |
+| `bounties_list` | `bounty_type` = `native` \| `multi_asset` \| `multi_asset_child` | List native bounties, Multi-Asset Bounties (`status=active` by default, unpaginated; `status=inactive` is paginated), or child bounties of a Multi-Asset Bounty (`child_status`). | Polkadot, Kusama |
+| `bounties_get` | `bounty_type` = `native` \| `multi_asset` \| `multi_asset_child` | Get one native bounty (optional `include_statistics`; `statistics` is null when the API has none), one Multi-Asset Bounty, or one child bounty. | Polkadot, Kusama |
+| `bounties_get_bounty_statistics` | — | Get native bounty payout statistics by `bounty_index` without fetching bounty details or its chain balance. Defaults to Polkadot. | Polkadot, Kusama |
+
+## Polkadot Fellowship
+
+| Tool | Enum | Description |
 | --- | --- | --- |
-| `posts_list_posts` | List discussion posts with pagination, exact label filtering, and a simple mode omitting body and poll fields. | Polkadot, Kusama, Polkadot Collectives, Hydration |
-| `posts_get_post` | Get one discussion post by uid with full markdown content and metadata. | Polkadot, Kusama, Polkadot Collectives, Hydration |
+| `fellowship_list` | `kind` = `feeds` \| `applications` \| `members` | Browse the activity feed or membership applications with pagination, or get the full member roster without pagination. |
+| `fellowship_get_member_detail` | — | Get a member profile with evidence, salary claims, submitted referenda, votes, and salary/rank statistics. |
+| `fellowship_list_address_activity` | `kind` = `referenda` \| `votes` | List Fellowship referenda submitted by an address, or its votes (`type` = `aye` \| `nay`). |
+| `fellowship_salary` | `kind` = `overview` \| `by_rank` \| `rank_changes` \| `member` \| `claimants` | Salary spending by cycle or by rank, rank-change counts, one address's salary statistics (`address`), or all claimants. |
+| `fellowship_treasury_get` | `view` = `balance` \| `status` | Get Treasury DOT/HOLLAR and salary USDT/HOLLAR balances, or active and total spend counts. Does not accept pagination. |
+| `fellowship_treasury_list_spends` | — | List Fellowship Treasury spends with amounts, state, and detail URLs. |
+| `fellowship_treasury_get_spend` | — | Get one spend's beneficiary, related referendum, and markdown content. |
 
-## Vesting
+## Polkadot Secretary
+
+| Tool | Enum | Description | Chains |
+| --- | --- | --- | --- |
+| `secretary_list` | `kind` = `members` \| `cycles` \| `statistics` | List current members with rank and configured salary, list salary cycles, or summarize salary and interim funding by asset and address. Does not accept pagination. | Polkadot Collectives |
+
+## Posts, Accounts, Blocks, and Identities
+
+| Tool | Enum | Description | Chains |
+| --- | --- | --- | --- |
+| `posts_list_posts` | — | List discussion posts with exact label filtering and a simple mode omitting body and poll fields. | Polkadot, Kusama, Polkadot Collectives, Hydration |
+| `posts_get_post` | — | Get one discussion post with its full markdown content. | Polkadot, Kusama, Polkadot Collectives, Hydration |
+| `account_list` | `kind` = `extrinsics` \| `transfers` \| `assets` \| `foreign_assets` | List account extrinsics, transfers, pallet-assets tokens, or pallet-foreign-assets (XCM) tokens. `assets` and `foreign_assets` require an Asset Hub chain. | StateScan chains; assets need Polkadot or Kusama Asset Hub |
+| `block_get_detail` | — | Get a block by height or hash, or the latest block. | StateScan chains |
+| `block_list` | `kind` = `events` \| `extrinsics` | List events or extrinsics with section, method, block, and date filters. | StateScan chains |
+| `identity_get_identities` | — | Batch-query display names and identity verification status for addresses. | Polkadot, Kusama, Hydration, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
+
+## User Records
+
+| Tool | Enum | Description | Chains |
+| --- | --- | --- | --- |
+| `get_user_overview` | — | Get a user profile, submission counts, and selected module vote statistics. | Polkadot, Kusama |
+| `get_user_vote_stats` | — | Get vote statistics for selected `modules` without fetching the user's profile or submission counts. Request failures return `data: null` and a structured `error` with `status` and `endpoint`. | Polkadot, Kusama |
+| `list_user_submissions` | — | List a user's submissions for one mapped category. | Polkadot, Kusama |
+| `list_user_voting` | `kind` = `votes` \| `vote_calls` | List a user's votes or vote calls in one voting module. `type` and `includes_title` apply only to `kind=votes`. Titles and states are included by default; set `includes_title: false` to omit them. | Polkadot, Kusama; Hydration only for `kind=votes, module=referenda` |
+
+## Vesting and Coretime
 
 | Tool | Description | Chains |
 | --- | --- | --- |
 | `get_account_vesting` | Get an account's Vesting lock, unlockable amount, and schedules with release end heights. | Polkadot Asset Hub, Kusama Asset Hub |
-| `list_vesting_accounts` | List accounts with Vesting schedules, globally sorted by unlockable amount by default. | Polkadot Asset Hub, Kusama Asset Hub |
-
-## Coretime
-
-| Tool | Description | Chains |
-| --- | --- | --- |
-| `list_coretime_sales` | List Coretime sale cycles with compact records. | Polkadot, Kusama |
-| `get_coretime_sale` | Get a Coretime sale cycle overview. | Polkadot, Kusama |
-
-## OpenGov
-
-| Tool | Description | Chains |
-| --- | --- | --- |
-| `opengov_list_tracks` | List governance track IDs, names, active referendum counts, and detail URLs. Collectives returns Fellowship tracks. | Polkadot, Kusama, Polkadot Collectives, Hydration |
-| `opengov_list_referenda` | List and filter referenda. | Polkadot, Kusama, Hydration, Polkadot Collectives |
-| `opengov_referendum_detail` | Get a referendum's full details. | Polkadot, Kusama, Hydration, Polkadot Collectives |
-| `opengov_referenda_summary` | Get referendum statistics. | Polkadot, Kusama, Hydration, Polkadot Collectives |
-| `opengov_list_comments` | List OpenGov referendum comments, optionally merged with Polkassembly. | Polkadot, Kusama, Hydration |
-| `fellowship_list_comments` | List Fellowship referendum comments, optionally merged with Polkassembly. | Kusama, Polkadot Collectives |
-| `ambassador_list_comments` | List Ambassador referendum comments. | Polkadot Collectives |
-| `opengov_list_referenda_by_address` | List referenda submitted by an address. | Polkadot, Kusama, Hydration |
-| `opengov_list_votes_by_address` | List referendum votes cast by an address. | Polkadot, Kusama, Hydration |
-| `list_delegates` | List delegates with delegation statistics and available profiles. | Polkadot, Kusama, Hydration |
-| `get_delegate_delegators` | List a delegate's delegators with summary statistics. | Polkadot, Kusama, Hydration |
-| `list_delegations` | List delegation relationships for one required OpenGov track. | Polkadot, Kusama, Hydration |
-
-## Democracy, Council, and Technical Committee
-
-| Tool | Description | Chains |
-| --- | --- | --- |
-| `democracy_list_referendums` | List legacy Democracy referendums. | Polkadot, Kusama, Hydration |
-| `democracy_list_proposals` | List Democracy public proposals. | Polkadot, Kusama, Hydration |
-| `democracy_list_externals` | List Democracy external proposals. | Polkadot, Kusama, Hydration |
-| `council_list_motions` | List Council motions with compact fields and detail URLs. | Polkadot, Kusama, Hydration |
-| `techcomm_list_proposals` | List Technical Committee proposals with compact fields and detail URLs. | Polkadot, Kusama, Hydration |
-| `techcomm_list_members` | Query current Technical Committee member addresses from chain storage. | Hydration |
-
-## Treasury and Bounties
-
-| Tool | Description | Chains |
-| --- | --- | --- |
-| `treasury_list_projects` | List all Treasury projects with compact metadata. | Polkadot |
-| `treasury_get_project_detail` | Get a project and its linked proposals, spends, tips, and bounties. | Polkadot |
-| `treasury_list_tips` | List tips with identities, state, median value, and detail URLs. | Polkadot, Kusama, Hydration |
-| `treasury_list_proposals` | List Treasury proposals with active and total counts. | Polkadot, Kusama, Hydration |
-| `treasury_list_spends` | List Treasury spends with active and total counts. | Polkadot, Kusama, Hydration |
-| `treasury_get_status` | Summarize Treasury activity counts. | Polkadot, Kusama, Hydration |
-| `get_treasury_burn` | Get cumulative Treasury burns, paginated records, and optional history. | Polkadot, Kusama, Hydration |
-| `treasury_get_balances` | Get Treasury balances for one or all supported chains. | Polkadot, Kusama, Hydration, Acala, Karura, Bifrost, Astar |
-| `bounties_list_bounties` | List bounties with active and total counts. | Polkadot, Kusama |
-| `bounties_get_bounty` | Get a native-asset bounty by bounty index. | Polkadot, Kusama |
-| `bounties_get_bounty_statistics` | Get a native-asset bounty's payout statistics. | Polkadot, Kusama |
-| `bounties_get_multi_asset_bounty` | Get a Multi-Asset Bounty by ID. | Polkadot, Kusama |
-| `bounties_list_active_multi_asset_bounties` | List active Multi-Asset Bounties. | Polkadot, Kusama |
-| `bounties_list_inactive_multi_asset_bounties` | List inactive Multi-Asset Bounties. | Polkadot, Kusama |
-| `bounties_list_multi_asset_child_bounties` | List Multi-Asset Child Bounties. | Polkadot, Kusama |
-| `bounties_get_multi_asset_child_bounty` | Get a Multi-Asset Child Bounty by parent ID, child index, and optional disambiguating block height. | Polkadot, Kusama |
-
-## Polkadot Fellowship
-
-| Tool | Description |
-| --- | --- |
-| `fellowship_list_feeds` | Browse the chronological Fellowship activity feed. |
-| `fellowship_list_applications` | List Fellowship membership applications with applicant, status, and detail URLs. |
-| `fellowship_list_members` | List current members and rank-0 candidates. |
-| `fellowship_get_member_detail` | Get a member profile, evidence, salary, referendum and voting histories, and statistics. |
-| `fellowship_list_referenda_by_address` | List Fellowship referenda submitted by an address. |
-| `fellowship_list_votes_by_address` | List Fellowship votes cast by an address. |
-| `fellowship_treasury_get_balance` | Get Treasury DOT/HOLLAR and salary USDT/HOLLAR balances. |
-| `fellowship_treasury_get_status` | Get active and total Treasury spend counts. |
-| `fellowship_treasury_list_spends` | List Treasury spends with amounts, state, and detail URLs. |
-| `fellowship_treasury_get_spend` | Get a spend's beneficiary, related referendum, and content. |
-| `get_fellowship_salary_overview` | Get salary spending by cycle and aggregated totals. |
-| `get_fellowship_salary_by_rank` | Get salary spending and its percentage breakdown by rank. |
-| `get_fellowship_rank_change_statistics` | Get promotion, demotion, and retention counts. |
-| `get_fellowship_member_statistics` | Get an address's salary totals, participating cycles, and rank history. |
-| `list_fellowship_salary_claimants` | List all salary claimants with claimed cycles and totals. |
-
-## Polkadot Secretary
-
-| Tool | Description | Chains |
-| --- | --- | --- |
-| `secretary_list_members` | List current members, ranks, configured salaries, and identities. | Polkadot Collectives |
-| `secretary_salary_cycles` | List salary cycles with payment counts, amounts, and block times. | Polkadot Collectives |
-| `secretary_salary_statistics` | Summarize salary and interim funding by asset and address, including the USD total. | Polkadot Collectives |
-
-## Accounts, Blocks, and Identities
-
-| Tool | Description | Chains |
-| --- | --- | --- |
-| `account_list_extrinsics` | List compact account extrinsics with detail URLs and identity mappings. | Polkadot, Kusama, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
-| `account_list_transfers` | List account transfers with detail URLs and identity mappings. | Polkadot, Kusama, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
-| `account_list_assets` | List the pallet-assets tokens held by an address with raw and formatted balances and asset metadata. | Polkadot Asset Hub, Kusama Asset Hub |
-| `account_list_foreign_assets` | List the pallet-foreign-assets (XCM) tokens held by an address with asset location, raw and formatted balances, and metadata. | Polkadot Asset Hub, Kusama Asset Hub |
-| `block_get_detail` | Get a block by height or hash, or get the latest block. | Polkadot, Kusama, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
-| `block_list_events` | List events with module, method, block, and date filters. | Polkadot, Kusama, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
-| `block_list_extrinsics` | List extrinsics with module, method, block, and date filters. | Polkadot, Kusama, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
-| `identity_get_identities` | Batch-query address display names and identity verification status. | Polkadot, Kusama, Hydration, Polkadot Collectives, Polkadot Asset Hub, Kusama Asset Hub |
-
-## User Records
-
-| Tool | Description | Chains |
-| --- | --- | --- |
-| `get_user_overview` | Get a user profile, submission counts, and vote statistics. | Polkadot, Kusama |
-| `list_user_submissions` | List a user's submissions by category. | Polkadot, Kusama |
-| `list_user_votes` | List a user's votes in OpenGov, Democracy, or Fellowship. | Polkadot, Kusama |
-| `list_user_vote_calls` | List a user's vote calls by module. | Polkadot, Kusama |
-| `get_user_vote_stats` | Get vote statistics across selected modules. | Polkadot, Kusama |
+| `list_vesting_accounts` | List accounts with Vesting schedules, ranked globally by unlockable amount by default. | Polkadot Asset Hub, Kusama Asset Hub |
+| `list_coretime_sales` | List Coretime sale cycles with compact records. Invalid list responses are rejected: `total` must be a nonnegative integer and `items` must be an array. | Polkadot, Kusama |
+| `get_coretime_sale` | Get a Coretime sale overview with optional purchases, renewals, and timeline. | Polkadot, Kusama |

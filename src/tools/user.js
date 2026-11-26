@@ -12,9 +12,13 @@ import {
 import {
   accountAddress,
   createStructuredJsonResult,
+  includesTitle,
   page,
   pageSize,
+  paginatedItemsSchema,
+  permissiveOutputSchema,
   readOnlyAnnotations,
+  rejectUnsupportedArguments,
 } from "./common.js";
 
 const userChains = z
@@ -24,15 +28,27 @@ const userChains = z
 const userAddress = accountAddress.describe(
   "SS58 address whose Subsquare user records should be queried",
 );
-const userModules = z
-  .array(z.enum(["referenda", "democracy", "fellowship"]))
-  .min(1)
-  .default(["referenda", "democracy", "fellowship"])
-  .describe("Voting modules to include");
+const userModulesInputSchema = z
+  .object({
+    chain: userChains,
+    address: userAddress,
+    modules: z
+      .array(z.enum(["referenda", "democracy", "fellowship"]))
+      .min(1)
+      .default(["referenda", "democracy", "fellowship"])
+      .describe("Voting modules to include"),
+  })
+  .strict();
 const userPageSize = (defaultValue) =>
   pageSize
     .default(defaultValue)
     .describe(`Items per page, maximum 100 (default ${defaultValue})`);
+const userListOutputSchema = z
+  .object({
+    pagination: paginatedItemsSchema.omit({ items: true }).nullable(),
+    data: paginatedItemsSchema.shape.items.nullable(),
+  })
+  .passthrough();
 
 function createUserErrorResult({ chain, address, error }) {
   return createStructuredJsonResult({
@@ -59,19 +75,29 @@ export function registerUserTools(server) {
     "get_user_overview",
     {
       description:
-        "Get a Subsquare user profile, submission counts, and selected module vote statistics.",
-      inputSchema: z
-        .object({
-          chain: userChains,
-          address: userAddress,
-          modules: userModules,
-        })
-        .strict(),
+        "Get a Subsquare user profile, submission counts, and selected module vote statistics. For vote statistics alone, use get_user_vote_stats.",
+      inputSchema: userModulesInputSchema,
+      outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
     async ({ chain, address, modules }) =>
       withUserErrorResult({ chain, address }, () =>
         getUserOverview({ chain, address, modules }),
+      ),
+  );
+
+  server.registerTool(
+    "get_user_vote_stats",
+    {
+      description:
+        "Get a Subsquare user's vote statistics for selected voting modules without loading the profile or submission counts.",
+      inputSchema: userModulesInputSchema,
+      outputSchema: permissiveOutputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async ({ chain, address, modules }) =>
+      withUserErrorResult({ chain, address }, () =>
+        getUserVoteStats({ chain, address, modules }),
       ),
   );
 
@@ -88,82 +114,86 @@ export function registerUserTools(server) {
             .enum(Object.keys(USER_CATEGORY_API_PATHS))
             .describe("Submission category to list"),
           page,
-          pageSize: userPageSize(20),
+          page_size: userPageSize(20),
         })
         .strict(),
+      outputSchema: userListOutputSchema,
       annotations: readOnlyAnnotations,
     },
-    async ({ chain, address, category, page, pageSize }) =>
+    async ({ chain, address, category, page, page_size: pageSize }) =>
       withUserErrorResult({ chain, address }, () =>
         listUserSubmissions({ chain, address, category, page, pageSize }),
       ),
   );
 
   server.registerTool(
-    "list_user_votes",
+    "list_user_voting",
     {
       description:
-        "List a Subsquare user's votes in one voting module, optionally filtered by vote type.",
+        "List a Subsquare user's votes or vote calls in one voting module, with pagination. For kind=votes, optionally filter by vote type or set includes_title=false to omit proposal metadata. Hydration supports only OpenGov votes (kind=votes, module=referenda).",
       inputSchema: z
         .object({
-          chain: userChains,
+          chain: z
+            .enum([chains.polkadot, chains.kusama, chains.hydration])
+            .default(chains.polkadot)
+            .describe("Hydration is only available for kind=votes with module=referenda"),
           address: userAddress,
+          kind: z
+            .enum(["votes", "vote_calls"])
+            .describe("Record set to list: votes or vote_calls"),
           module: z.enum(["referenda", "democracy", "fellowship"]),
           type: z
             .enum(["all", "aye", "nay", "split", "abstain"])
-            .default("all")
-            .describe("Vote type filter; all omits the backend type parameter"),
+            .optional()
+            .describe(
+              "Only for kind=votes: vote type filter (default all, no filter)",
+            ),
+          includes_title: includesTitle.describe(
+            "Only for kind=votes: include proposal titles and states (default true); set false to omit",
+          ),
           page,
-          pageSize: userPageSize(25),
+          page_size: userPageSize(25),
         })
         .strict(),
+      outputSchema: userListOutputSchema,
       annotations: readOnlyAnnotations,
     },
-    async ({ chain, address, module, type, page, pageSize }) =>
-      withUserErrorResult({ chain, address }, () =>
-        listUserVotes({ chain, address, module, type, page, pageSize }),
-      ),
-  );
+    async ({
+      chain,
+      address,
+      kind,
+      module,
+      type,
+      includes_title: includeTitle,
+      page,
+      page_size: pageSize,
+    }) => {
+      if (chain === chains.hydration && (kind !== "votes" || module !== "referenda")) {
+        throw new Error(
+          "[unsupported_chain] Hydration only supports OpenGov votes. Hint: set kind=votes and module=referenda, or use polkadot or kusama.",
+        );
+      }
+      if (kind === "vote_calls") {
+        rejectUnsupportedArguments(
+          "kind=vote_calls",
+          { type, includes_title: includeTitle },
+          "Use type and includes_title only for kind=votes.",
+        );
+      }
 
-  server.registerTool(
-    "list_user_vote_calls",
-    {
-      description:
-        "List a Subsquare user's vote calls in one voting module, with pagination.",
-      inputSchema: z
-        .object({
-          chain: userChains,
-          address: userAddress,
-          module: z.enum(["referenda", "democracy", "fellowship"]),
-          page,
-          pageSize: userPageSize(25),
-        })
-        .strict(),
-      annotations: readOnlyAnnotations,
+      return withUserErrorResult({ chain, address }, () =>
+        kind === "votes"
+          ? listUserVotes({
+              chain,
+              address,
+              module,
+              type: type ?? "all",
+              includesTitle: includeTitle,
+              page,
+              pageSize,
+            })
+          : listUserVoteCalls({ chain, address, module, page, pageSize }),
+      );
     },
-    async ({ chain, address, module, page, pageSize }) =>
-      withUserErrorResult({ chain, address }, () =>
-        listUserVoteCalls({ chain, address, module, page, pageSize }),
-      ),
-  );
-
-  server.registerTool(
-    "get_user_vote_stats",
-    {
-      description:
-        "Get vote statistics for a Subsquare user across selected voting modules.",
-      inputSchema: z
-        .object({
-          chain: userChains,
-          address: userAddress,
-          modules: userModules,
-        })
-        .strict(),
-      annotations: readOnlyAnnotations,
-    },
-    async ({ chain, address, modules }) =>
-      withUserErrorResult({ chain, address }, () =>
-        getUserVoteStats({ chain, address, modules }),
-      ),
   );
 }

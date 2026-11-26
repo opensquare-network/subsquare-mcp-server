@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { supportedChains } from "../config/chains.js";
 
+export { paginatedItemsSchema, zeroBasedPaginatedItemsSchema } from "../utils/pagination.js";
+
 export const page = z
   .number()
   .int()
@@ -21,26 +23,24 @@ export const paginationInputShape = {
   page_size: pageSize,
 };
 
-export const paginatedItemsSchema = z.object({
-  items: z
-    .array(z.object({}).passthrough())
-    .describe("Paginated records; fields vary by endpoint"),
-  page: z
-    .number()
-    .int()
-    .positive()
-    .describe("Page number returned by SubSquare"),
-  pageSize: z
-    .number()
-    .int()
-    .positive()
-    .describe("Page size returned by SubSquare"),
-  total: z
-    .number()
-    .int()
-    .nonnegative()
-    .describe("Total number of matching records"),
-});
+// Mixed tools validate the selected mode before applying pagination defaults.
+export const optionalPaginationInputShape = {
+  page: page.removeDefault().optional().describe(page.description),
+  page_size: pageSize.removeDefault().optional().describe(pageSize.description),
+};
+
+export function rejectUnsupportedArguments(mode, args, hint = "Remove these arguments.") {
+  const names = Object.keys(args).filter((name) => args[name] !== undefined);
+  if (names.length) {
+    throw new Error(
+      `[unsupported_filter] ${names.join(", ")} not valid for ${mode}. Hint: ${hint}`,
+    );
+  }
+}
+
+// Structured content is still returned; the schema stays permissive for deep or
+// fast-moving payloads so tools/list stays small.
+export const permissiveOutputSchema = z.object({}).passthrough();
 
 export const accountAddress = z
   .string()
@@ -70,21 +70,16 @@ export const readOnlyAnnotations = {
   readOnlyHint: true,
 };
 
-function createJsonTextContent(data) {
-  return {
-    type: "text",
-    text: JSON.stringify(data),
-  };
-}
-
-export function createJsonResult(data) {
-  return {
-    content: [createJsonTextContent(data)],
-  };
-}
-
+// Every tool returns the payload as structuredContent and mirrors it as text so
+// clients that only read content still receive the data.
 export function createStructuredJsonResult(data) {
   return {
     structuredContent: data,
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(data),
+      },
+    ],
   };
 }

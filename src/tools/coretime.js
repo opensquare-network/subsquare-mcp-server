@@ -4,6 +4,8 @@ import { getCoretimeSale, listCoretimeSales } from "../services/coretime.js";
 import {
   createStructuredJsonResult,
   pageSize,
+  paginatedItemsSchema,
+  permissiveOutputSchema,
   readOnlyAnnotations,
 } from "./common.js";
 
@@ -64,13 +66,7 @@ export function registerCoretimeTools(server) {
     {
       description: "List Coretime sale cycles to locate a saleId.",
       inputSchema: { chain, limit: limit.default(10), offset },
-      outputSchema: {
-        ...currency,
-        ...pagination,
-        items: z.array(
-          z.object({ ...sale, info: z.object(region).nullable() }),
-        ),
-      },
+      outputSchema: paginatedItemsSchema.pick({ items: true, total: true }).passthrough(),
       annotations: readOnlyAnnotations,
     },
     async (args) => createStructuredJsonResult(await listCoretimeSales(args)),
@@ -92,61 +88,7 @@ export function registerCoretimeTools(server) {
         renewalsLimit: limit.default(20),
         renewalsOffset: offset,
       },
-      outputSchema: {
-        ...currency,
-        ...sale,
-        info: z
-          .object({
-            ...region,
-            coresOffered: count.nullable(),
-            coresSold: count.nullable(),
-          })
-          .nullable(),
-        purchaseCount: count,
-        purchaseRevenue: amount,
-        renewalCount: count,
-        renewalRevenue: amount,
-        infoUpdatedAt: z
-          .object({
-            chain: z.string(),
-            blockHeight: count,
-            blockTime: z
-              .number()
-              .nullable()
-              .describe("Timestamp in milliseconds"),
-          })
-          .nullable()
-          .describe("When sale info was updated"),
-        purchases: z
-          .object({
-            ...pagination,
-            items: z.array(
-              z.object({
-                ...transaction,
-                regionId: z.object({ core: count }),
-              }),
-            ),
-          })
-          .optional(),
-        renewals: z
-          .object({
-            ...pagination,
-            items: z.array(
-              z.object({ ...transaction, oldCore: count, core: count }),
-            ),
-          })
-          .optional(),
-        timeline: z
-          .array(
-            z.object({
-              name: z.string(),
-              args: z.unknown().describe("Event arguments"),
-              indexer,
-            }),
-          )
-          .optional()
-          .describe("Unpaginated events, included only when requested"),
-      },
+      outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
     async (args) => createStructuredJsonResult(await getCoretimeSale(args)),

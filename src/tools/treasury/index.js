@@ -14,193 +14,134 @@ import {
   summarizeTreasuryProject,
 } from "../../services/treasury/index.js";
 import {
-  createJsonResult,
   createStructuredJsonResult,
-  page,
-  pageSize,
+  optionalPaginationInputShape,
+  paginatedItemsSchema,
   readOnlyAnnotations,
+  rejectUnsupportedArguments,
 } from "../common.js";
-import { registerTreasuryProjectTools } from "./projects.js";
+import {
+  registerTreasuryProjectTools,
+  treasuryProjectSummarySchema,
+} from "./projects.js";
 
 const treasuryChain = z
   .enum(treasuryChains)
   .describe("Treasury chain to query: polkadot, kusama, or hydration");
 
-const treasuryStatusInputSchema = { chain: treasuryChain };
-const treasuryListInputSchema = {
-  chain: treasuryChain,
-  page,
-  page_size: pageSize,
-};
-
-const treasuryBalancesInputSchema = {
-  chain: z
-    .enum(dotTreasuryChains)
-    .optional()
-    .describe(
-      "Optional DotTreasury chain. Omit to return every reported chain.",
-    ),
-};
-
-const treasuryBurnInputSchema = {
-  chain: treasuryChain,
-  page,
-  pageSize,
-  includeHistory: z
-    .boolean()
-    .default(false)
-    .describe("Include burn history, ordered newest first (default false)"),
-};
-
-const treasuryTipIdentitySchema = z
-  .object({
-    address: z.string(),
-    info: z
-      .object({
-        status: z.string().optional(),
-        display: z.string().optional(),
-      })
-      .optional(),
-  })
-  .nullable();
-
-const treasuryTipsOutputSchema = {
-  page: z.number().int().positive(),
-  pageSize: z.number().int().positive(),
-  total: z.number().int().nonnegative(),
-  items: z.array(
-    z.object({
-      hash: z.string().optional(),
-      title: z.string().optional(),
-      finder: z.string().optional(),
-      finderIdentity: treasuryTipIdentitySchema,
-      beneficiary: z.string().optional(),
-      beneficiaryIdentity: treasuryTipIdentitySchema,
-      createdAt: z.string().optional(),
-      lastActivityAt: z.string().optional(),
-      commentsCount: z.number().int().nullable().optional(),
-      state: z.string().nullable(),
-      medianValue: z.union([z.string(), z.number()]).nullable(),
-      url: z.string().url().nullable(),
-    }),
-  ),
-};
-
-const treasuryAssetBalanceOutputSchema = z.object({
-  balance: z
-    .string()
-    .describe(
-      "Raw balance in the token's smallest unit; apply decimals for display",
-    ),
-  decimals: z.number().int().nonnegative(),
-  price: z.number().nullable(),
-  priceUpdateAt: z
-    .number()
-    .nullable()
-    .describe(
-      "Unix timestamp in milliseconds when the asset price was updated",
-    ),
-  token: z.string(),
-});
-
-const treasuryBalanceOutputSchema = z.object({
-  balance: z
-    .string()
-    .describe("Chain-level balance as returned by DotTreasury"),
-  balanceUpdateAt: z
-    .number()
-    .nullable()
-    .describe(
-      "Unix timestamp in milliseconds when the chain balance was updated",
-    ),
-  chain: z.string(),
-  price: z.number().nullable(),
-  priceUpdateAt: z
-    .number()
-    .nullable()
-    .describe(
-      "Unix timestamp in milliseconds when the chain price was updated",
-    ),
-  balances: z.array(treasuryAssetBalanceOutputSchema).nullable(),
-});
-
-const treasuryBalancesOutputSchema = {
-  treasuries: z.array(treasuryBalanceOutputSchema),
-};
+const TREASURY_LIST_KINDS = ["projects", "tips", "proposals", "spends"];
+const TREASURY_GET_VIEWS = ["status", "burn"];
 
 export function registerTreasuryTools(server) {
   server.registerTool(
-    "get_treasury_burn",
+    "treasury_list",
     {
       description:
-        "Get total Treasury burns, compact paginated records, and optional history (newest first). Amounts are raw; treasuryBalance is Remnant. Block heights and times are returned directly on each record.",
-      inputSchema: treasuryBurnInputSchema,
+        "List Treasury records on a chain. kind=projects lists compact Polkadot project metadata without pagination; use treasury_get_project_detail for linked funding records. Tips, proposals, and spends are paginated and include compact records with detail URLs.",
+      inputSchema: z
+        .object({
+          chain: treasuryChain,
+          kind: z
+            .enum(TREASURY_LIST_KINDS)
+            .describe("Record set to list: projects, tips, proposals, or spends"),
+          ...optionalPaginationInputShape,
+        })
+        .strict(),
+      outputSchema: paginatedItemsSchema
+        .partial()
+        .extend({ projects: z.array(treasuryProjectSummarySchema).optional() })
+        .passthrough(),
       annotations: readOnlyAnnotations,
     },
-    async (args) => createJsonResult(await getTreasuryBurn(args)),
+    async ({ chain, kind, page: pageValue, page_size: pageSizeValue }) => {
+      if (kind === "projects") {
+        if (chain !== "polkadot") {
+          throw new Error(
+            `[unsupported_chain] Treasury projects are only available on polkadot. Hint: use kind=tips, proposals, or spends for ${chain}.`,
+          );
+        }
+        rejectUnsupportedArguments(
+          "kind=projects",
+          { page: pageValue, page_size: pageSizeValue },
+          "Omit page and page_size; the result contains all projects.",
+        );
+        return createStructuredJsonResult({
+          projects: (await listTreasuryProjects()).map(summarizeTreasuryProject),
+        });
+      }
+
+      const handlers = {
+        tips: listTreasuryTips,
+        proposals: listTreasuryProposals,
+        spends: listTreasurySpends,
+      };
+
+      return createStructuredJsonResult(
+        await handlers[kind]({
+          chain,
+          page: pageValue ?? 1,
+          page_size: pageSizeValue ?? 25,
+        }),
+      );
+    },
   );
 
   server.registerTool(
-    "treasury_list_projects",
+    "treasury_get",
     {
       description:
-        "List every Polkadot Treasury project with compact metadata.",
-      inputSchema: {},
+        "Get Treasury-level data on a chain. view=status returns active and total counts for proposals, spends, and bounties; view=burn returns cumulative Treasury burns with paginated records and optional history. Pass pagination only for view=burn.",
+      inputSchema: z
+        .object({
+          chain: treasuryChain,
+          view: z
+            .enum(TREASURY_GET_VIEWS)
+            .describe("View to return: status or burn"),
+          ...optionalPaginationInputShape,
+          include_history: z
+            .boolean()
+            .optional()
+            .describe(
+              "Only for view=burn: include burn history, newest first (default false)",
+            ),
+        })
+        .strict(),
+      outputSchema: paginatedItemsSchema
+        .partial()
+        .extend({
+          totalBurnt: z
+            .string()
+            .optional()
+            .describe("Cumulative burns in smallest units; only for view=burn"),
+          history: paginatedItemsSchema.shape.items.optional(),
+        })
+        .passthrough(),
       annotations: readOnlyAnnotations,
     },
-    async () => {
-      const result = await listTreasuryProjects();
-      return createJsonResult(result.map(summarizeTreasuryProject));
-    },
-  );
+    async ({
+      chain,
+      view,
+      page: pageValue,
+      page_size: pageSizeValue,
+      include_history: includeHistory,
+    }) => {
+      if (view === "status") {
+        rejectUnsupportedArguments(
+          "view=status",
+          { page: pageValue, page_size: pageSizeValue, include_history: includeHistory },
+          "Use these arguments only for view=burn.",
+        );
+        return createStructuredJsonResult(await getTreasuryStatus({ chain }));
+      }
 
-  registerTreasuryProjectTools(server);
-
-  server.registerTool(
-    "treasury_list_tips",
-    {
-      description:
-        "List paginated Treasury tips on Polkadot, Kusama, or Hydration. Returns compact hashes, finder and beneficiary identities, state, raw median value, and detail URL.",
-      inputSchema: treasuryListInputSchema,
-      outputSchema: treasuryTipsOutputSchema,
-      annotations: readOnlyAnnotations,
-    },
-    async (args) => createStructuredJsonResult(await listTreasuryTips(args)),
-  );
-
-  server.registerTool(
-    "treasury_list_proposals",
-    {
-      description:
-        "List Treasury proposals on Polkadot, Kusama, or Hydration with pagination and active/total statistics.",
-      inputSchema: treasuryListInputSchema,
-      annotations: readOnlyAnnotations,
-    },
-    async (args) => createJsonResult(await listTreasuryProposals(args)),
-  );
-
-  server.registerTool(
-    "treasury_list_spends",
-    {
-      description:
-        "List Treasury spends on Polkadot, Kusama, or Hydration with pagination and active/total statistics.",
-      inputSchema: treasuryListInputSchema,
-      annotations: readOnlyAnnotations,
-    },
-    async (args) => createJsonResult(await listTreasurySpends(args)),
-  );
-
-  server.registerTool(
-    "treasury_get_status",
-    {
-      description:
-        "Summarize current Treasury activity for Polkadot, Kusama, or Hydration with active and total counts.",
-      inputSchema: treasuryStatusInputSchema,
-      annotations: readOnlyAnnotations,
-    },
-    async (args) => {
-      const result = await getTreasuryStatus(args);
-      return createJsonResult(result);
+      return createStructuredJsonResult(
+        await getTreasuryBurn({
+          chain,
+          page: pageValue ?? 1,
+          pageSize: pageSizeValue ?? 25,
+          includeHistory: includeHistory ?? false,
+        }),
+      );
     },
   );
 
@@ -208,14 +149,37 @@ export function registerTreasuryTools(server) {
     "treasury_get_balances",
     {
       description:
-        "Retrieve current treasury balances for one chain or all supported chains.",
-      inputSchema: treasuryBalancesInputSchema,
-      outputSchema: treasuryBalancesOutputSchema,
+        "Get Treasury balances reported by DotTreasury for one chain or every reported chain.",
+      inputSchema: {
+        chain: z
+          .enum(dotTreasuryChains)
+          .optional()
+          .describe(
+            "Optional DotTreasury chain. Omit to return every reported chain.",
+          ),
+      },
+      outputSchema: {
+        treasuries: z.array(
+          z.object({
+            chain: z.string(),
+            balance: z.string().describe("Chain-level balance as reported by DotTreasury"),
+            balances: z.array(
+              z.object({
+                token: z.string(),
+                balance: z.string().describe("Raw balance in the asset's smallest units"),
+                decimals: z.number().int().nonnegative(),
+              }).passthrough(),
+            ).nullable(),
+          }).passthrough(),
+        ),
+      },
       annotations: readOnlyAnnotations,
     },
-    async (args) => {
-      const treasuries = await getTreasuryBalances(args);
+    async ({ chain }) => {
+      const treasuries = await getTreasuryBalances({ chain });
       return createStructuredJsonResult({ treasuries });
     },
   );
+
+  registerTreasuryProjectTools(server);
 }

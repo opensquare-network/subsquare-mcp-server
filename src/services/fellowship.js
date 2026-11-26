@@ -18,6 +18,7 @@ import {
   getIdentityMap,
 } from "./identity.js";
 import { formatAmount } from "../utils/amount.js";
+import { requirePaginatedResponse } from "../utils/pagination.js";
 
 const FELLOWSHIP_MEMBERS_PATH = "fellowship/members";
 const FELLOWSHIP_FEEDS_PATH = "fellowship/feeds";
@@ -158,10 +159,11 @@ export async function listFellowshipFeeds(query = {}) {
     new URL(FELLOWSHIP_FEEDS_PATH, apiUrl),
     query,
   );
+  const { items } = requirePaginatedResponse(feeds, "SubSquare Fellowship feeds");
 
   return {
     ...pick(feeds, HISTORY_PAGE_FIELDS),
-    items: Array.isArray(feeds?.items) ? feeds.items.map(compactFeedItem) : [],
+    items: items.map(compactFeedItem),
   };
 }
 
@@ -172,37 +174,38 @@ export async function listFellowshipApplications({ page, page_size } = {}) {
     { page, page_size },
   );
 
+  // The endpoint echoes "last" verbatim; consumers get a numeric page.
+  const resolvedPage =
+    page === "last" &&
+    Number.isInteger(applications?.total) &&
+    Number.isInteger(applications?.pageSize)
+      ? Math.max(Math.ceil(applications.total / applications.pageSize), 1)
+      : applications?.page;
+  const { items, pageSize, total } = requirePaginatedResponse(
+    { ...applications, page: resolvedPage },
+    "SubSquare Fellowship applications",
+  );
+
   return {
-    // The endpoint echoes a "last" page back verbatim; report the resolved
-    // last page number instead so consumers always get numeric pagination.
-    page:
-      page === "last" &&
-      Number.isInteger(applications?.total) &&
-      Number.isInteger(applications?.pageSize)
-        ? Math.max(Math.ceil(applications.total / applications.pageSize), 1)
-        : applications?.page,
-    pageSize: applications?.pageSize,
-    total: applications?.total,
-    items: Array.isArray(applications?.items)
-      ? applications.items.map((application) => ({
-          ...pick(application, [
-            "applicationUid",
-            "title",
-            "applicant",
-            "proposer",
-            "status",
-            "createdAt",
-            "lastActivityAt",
-            "commentsCount",
-          ]),
-          url: new URL(
-            `fellowship/applications/${encodeURIComponent(
-              application.applicationUid,
-            )}`,
-            siteUrl,
-          ).toString(),
-        }))
-      : [],
+    page: resolvedPage,
+    pageSize,
+    total,
+    items: items.map((application) => ({
+      ...pick(application, [
+        "applicationUid",
+        "title",
+        "applicant",
+        "proposer",
+        "status",
+        "createdAt",
+        "lastActivityAt",
+        "commentsCount",
+      ]),
+      url: new URL(
+        `fellowship/applications/${encodeURIComponent(application.applicationUid)}`,
+        siteUrl,
+      ).toString(),
+    })),
   };
 }
 

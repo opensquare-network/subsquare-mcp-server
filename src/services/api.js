@@ -16,7 +16,10 @@ export class ApiRequestError extends Error {
 
 function addQueryParams(url, query) {
   const requestUrl = new URL(url);
-  requestUrl.search = new URLSearchParams(omitBy(query, isNil)).toString();
+
+  for (const [name, value] of Object.entries(omitBy(query, isNil))) {
+    requestUrl.searchParams.set(name, value);
+  }
 
   return requestUrl;
 }

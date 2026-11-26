@@ -168,6 +168,19 @@ export async function getUserOverview({ chain, address, modules }) {
   });
 }
 
+export async function getUserVoteStats({ chain, address, modules }) {
+  const voteStats = await fetchVoteStatsMap({ chain, address }, modules);
+
+  return createUserResponse({
+    chain,
+    address,
+    detail: buildUserDetailUrl(chain, buildUserPath(address)),
+    source: Object.values(voteStats).map((voteStat) => voteStat.source),
+    pagination: null,
+    data: { voteStats },
+  });
+}
+
 export async function listUserSubmissions({
   chain,
   address,
@@ -189,6 +202,7 @@ export async function listUserVotes({
   address,
   module,
   type,
+  includesTitle = true,
   page,
   pageSize,
 }) {
@@ -198,7 +212,7 @@ export async function listUserVotes({
     query: {
       page,
       page_size: pageSize,
-      includes_title: 1,
+      ...(includesTitle ? { includes_title: 1 } : {}),
       ...(type === "all" ? {} : { type }),
     },
   });
@@ -220,17 +234,4 @@ export async function listUserVoteCalls({
   });
 
   return createUserListResponse({ chain, address, response });
-}
-
-export async function getUserVoteStats({ chain, address, modules }) {
-  const voteStats = await fetchVoteStatsMap({ chain, address }, modules);
-
-  return createUserResponse({
-    chain,
-    address,
-    detail: buildUserDetailUrl(chain, buildUserPath(address)),
-    source: Object.values(voteStats).map((voteStat) => voteStat.source),
-    pagination: null,
-    data: { voteStats },
-  });
 }
