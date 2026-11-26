@@ -1,3 +1,4 @@
+import BigNumber from "bignumber.js";
 import { z } from "zod";
 import { getApprovalPercent, toPercent } from "../../utils/percentage.js";
 import { ApiRequestError, request } from "../api.js";
@@ -36,7 +37,21 @@ export const voteStatsSchema = z.object({
 });
 
 function toBigInt(value) {
-  return BigInt(value ?? 0);
+  if (value == null) {
+    return 0n;
+  }
+
+  const text = String(value).trim();
+  if (/^0x[0-9a-f]+$/i.test(text)) {
+    return BigInt(text);
+  }
+
+  const amount = new BigNumber(text);
+  if (!amount.isFinite()) {
+    throw new Error("[invalid_upstream_response] Vote amounts must be finite integers");
+  }
+
+  return BigInt(amount.toFixed(0));
 }
 
 function sumSplitValues(vote, fields) {

@@ -873,6 +873,37 @@ test("empty vote and tally pages distinguish missing capital from zero votes", a
   await expectToolError(client, "list_referendum_votes", args, /\[invalid_upstream_response\].*votes response/);
 });
 
+test("scientific notation vote amounts are parsed exactly for sorting and totals", async (t) => {
+  t.mock.method(request, "get", async (url) => {
+    if (url.pathname === "/gov2/referenda/0/votes") {
+      return [
+        {
+          account: "delegating", isDelegating: true, aye: true, conviction: 1,
+          balance: "1.2E+21", votes: "1.2E+21",
+        },
+        {
+          account: "split", isSplit: true, conviction: 0,
+          ayeBalance: "6E+20", ayeVotes: "6E+20", nayBalance: "6E+20", nayVotes: "6E+20",
+        },
+        { account: "standard", aye: false, conviction: 0, balance: "5", votes: "5" },
+      ];
+    }
+    assert.equal(url.pathname, "/gov2/referendums/0/vote-stats");
+    return {};
+  });
+  const client = await connect(t);
+  const result = await call(client, "list_referendum_votes", {
+    chain: "polkadot", referendum_type: "opengov", referendum_index: 0, page_size: 10,
+  });
+  assert.deepEqual(result.items.map(({ account }) => account), ["delegating", "split", "standard"]);
+  assert.deepEqual(
+    [result.summary.voters, result.summary.delegating, result.summary.split, result.summary.nay],
+    [3, 1, 1, 1],
+  );
+  assert.equal(result.summary.totalBalance, "2400000000000000000005");
+  assert.equal(result.summary.totalVotes, "2400000000000000000005");
+});
+
 test("identity lookup failures do not discard referendum votes or indexed stats", async (t) => {
   const key = "SUBSQUARE_IDENTITY_SERVER_URL";
   const original = process.env[key];
@@ -926,6 +957,33 @@ test("identity lookup failures do not discard referendum votes or indexed stats"
     "available", { [polkadotAddress]: info },
   ]);
   assert.equal(warn.mock.callCount(), 6);
+});
+
+test("identity responses with explicit null info do not poison the cache", async (t) => {
+  const key = "SUBSQUARE_IDENTITY_SERVER_URL";
+  const original = process.env[key];
+  const identityAddress = "15UHvPeMjYLvMLqh6bWLxAP3MbqjjsMXFWToJKCijzGPM3p9";
+  process.env[key] = "https://identities.example";
+  t.after(() => {
+    if (original === undefined) delete process.env[key];
+    else process.env[key] = original;
+  });
+
+  let upstream = [{ address: identityAddress, info: null }];
+  const post = t.mock.method(request, "post", async () => upstream);
+  const client = await connect(t);
+  const empty = await call(client, "identity_get_identities", {
+    chain: "polkadot", addresses: [identityAddress],
+  });
+  assert.deepEqual(empty.identities, []);
+
+  const identity = { status: "VERIFIED", display: "Recovered identity" };
+  upstream = [{ address: identityAddress, info: identity }];
+  const recovered = await call(client, "identity_get_identities", {
+    chain: "polkadot", addresses: [identityAddress],
+  });
+  assert.deepEqual(recovered.identities, [{ address: identityAddress, info: identity }]);
+  assert.equal(post.mock.callCount(), 2);
 });
 
 test("OpenGov turnout statistics can be skipped and unavailable stats do not hide votes", async (t) => {
@@ -1060,6 +1118,10 @@ test("beneficiary activity normalizes SS58 addresses and validates requested pag
   };
   await expectToolError(
     client, "get_address_treasury_benefits", { ...args, address }, /\[invalid_address\].*SS58/,
+  );
+  const extendedAddress = "164SQs4QBRHV2LCGi4bup3E66oekBxhhh41ptLVwuB5ynx3j4";
+  await expectToolError(
+    client, "get_address_treasury_benefits", { ...args, address: extendedAddress }, /\[invalid_address\].*32-byte/,
   );
   assert.equal(get.mock.callCount(), 0);
   await expectToolError(
@@ -1374,6 +1436,20 @@ test("governance event windows are inclusive and invalid timestamps fail before 
   await expectToolError(
     client, "list_gov_events", { ...args, end_time: time - 1 }, /\[invalid_time_window\]/,
   );
+  for (const invalidTime of [
+    "2025-02-30T00:00:00Z",
+    "2025-02-29T00:00:00Z",
+    "2025-04-31T00:00:00Z",
+    "2025-13-01T00:00:00Z",
+    "March 5, 2025",
+  ]) {
+    await expectToolError(
+      client, "list_gov_events", { ...args, begin_time: invalidTime }, /\[invalid_time\].*begin_time/,
+    );
+    await expectToolError(
+      client, "list_gov_events", { ...args, end_time: invalidTime }, /\[invalid_time\].*end_time/,
+    );
+  }
   assert.equal(get.mock.callCount(), 0);
   const events = await call(client, "list_gov_events", args);
   assert.deepEqual(events.items.map(({ blockTime }) => blockTime), [time]);
@@ -1415,6 +1491,11 @@ test("governance event details use the identifiers for each upstream event type"
       { type: "treasury_tip_closed", category: "Treasury", hash, indexer: { blockTime } },
       { type: "democracy_passed", category: "Democracy", referendumIndex: 8, indexer: { blockTime } },
       { type: "treasury_spend_approved", index: 4, hash, indexer: { blockTime } },
+      { type: "fellowship_executed", category: "Collectives", index: 240, indexer: { blockTime } },
+      {
+        type: "fellowship_treasury_spend_approved", category: "Collectives",
+        index: 4, indexer: { blockTime },
+      },
     ];
   });
   const client = await connect(t);
@@ -1422,7 +1503,10 @@ test("governance event details use the identifiers for each upstream event type"
     chain: "polkadot", begin_time: blockTime, end_time: blockTime, summary: false,
   });
   assert.deepEqual(
-    events.items.map(({ referendumIndex, tipHash }) => [referendumIndex, tipHash]),
-    [[1777, null], [0, null], [null, hash], [8, null], [null, null]],
+    events.items.map(({ referendumIndex, spendIndex, tipHash }) => [referendumIndex, spendIndex, tipHash]),
+    [
+      [1777, null, null], [0, null, null], [null, null, hash], [8, null, null],
+      [null, null, null], [240, null, null], [null, 4, null],
+    ],
   );
 });

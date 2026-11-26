@@ -175,8 +175,8 @@ export async function getAddressTreasuryBenefits({
   page_size: pageSize = 25,
 } = {}) {
   const addressInfo = getSs58AddressInfo(address);
-  if (!addressInfo.isValid) {
-    throw new Error("[invalid_address] address must be a valid SS58 account address");
+  if (!addressInfo.isValid || addressInfo.publicKey.length !== 32) {
+    throw new Error("[invalid_address] address must be a valid 32-byte SS58 account address");
   }
 
   const normalizedAddress = AccountId(beneficiarySs58Formats[chain]).dec(addressInfo.publicKey);

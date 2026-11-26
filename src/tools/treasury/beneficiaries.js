@@ -73,7 +73,7 @@ export function registerTreasuryBeneficiaryTools(server) {
         "Get paginated treasury spends, proposals, tips, bounties and child bounties naming an address as beneficiary, with per-module counts and estimated USD values. Counts and record lists include unpaid records; the USD estimates cover only paid or awarded records.",
       inputSchema: z.object({
         chain: beneficiaryChain,
-        address: accountAddress.describe("Valid SS58 account address; re-encoded for the selected chain before querying"),
+        address: accountAddress.describe("Valid 32-byte SS58 account address; re-encoded for the selected chain before querying"),
         modules: z
           .array(benefitModule)
           .nonempty()

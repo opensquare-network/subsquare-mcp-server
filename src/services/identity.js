@@ -93,9 +93,22 @@ export async function getIdentityMap({ chain, addresses = [] } = {}) {
   }
 
   const fetchedIdentities = new Map(
-    identities.map((identity) => [identity.address, identity]),
+    identities
+      .filter((identity) => identity.info != null)
+      .map((identity) => [identity.address, identity]),
+  );
+  // Explicit null info is treated as no identity and is not cached, so an
+  // anomalous record cannot mask a later valid identity.
+  const uncachedAddresses = new Set(
+    identities
+      .filter((identity) => identity.info == null && !fetchedIdentities.has(identity.address))
+      .map((identity) => identity.address),
   );
   for (const address of missingAddresses) {
+    if (uncachedAddresses.has(address)) {
+      continue;
+    }
+
     const identity = fetchedIdentities.get(address) ?? null;
     identityCache.set(getIdentityCacheKey(chain, address), identity);
     if (!isNil(identity)) {

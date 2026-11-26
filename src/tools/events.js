@@ -25,7 +25,7 @@ export function registerEventTools(server) {
     "list_gov_events",
     {
       description:
-        "List governance events in a time window: treasury, collectives, democracy and OpenGov events such as referendum state changes, bounty and tip activity, with block height and block time. Summary mode returns compact records for digests; detail mode also returns event data and decoded proposal calls. Excludes council, technical committee and tip vote events that Subsquare filters out. Both bounds are inclusive and required.",
+        "List governance events in a time window: treasury, collectives, democracy and OpenGov events such as referendum state changes, bounty and tip activity, with block height and block time. Summary mode returns compact records for digests; detail mode also returns event data, decoded proposal calls, and identifiers such as the referendum index, Fellowship Treasury spend index, bounty, proposal, or tip where available. Excludes council, technical committee and tip vote events that Subsquare filters out. Both bounds are inclusive and required.",
       inputSchema: z.object({
         chain: z
           .enum(subsquareApiChains)
