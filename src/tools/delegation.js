@@ -8,6 +8,7 @@ import {
 import {
   accountAddress,
   createStructuredJsonResult,
+  page,
   paginatedItemsSchema,
   readOnlyAnnotations,
   rejectUnsupportedArguments,
@@ -17,19 +18,13 @@ const opengovChain = z
   .enum([chains.polkadot, chains.kusama, chains.hydration])
   .describe("OpenGov chain to query: polkadot, kusama, or hydration");
 
-const page = z
-  .number()
-  .int()
-  .positive()
-  .default(1)
-  .describe("Page number, starts at 1 (default 1)");
 const pageSize = z
   .number()
   .int()
   .positive()
   .max(200)
-  .default(100)
-  .describe("Items per page, maximum 200 (default 100)");
+  .optional()
+  .describe("Items per page, maximum 200 (default 100 for delegators; 25 for delegates and track)");
 
 export function registerDelegationTools(server) {
   server.registerTool(
@@ -59,7 +54,8 @@ export function registerDelegationTools(server) {
       outputSchema: paginatedItemsSchema.passthrough(),
       annotations: readOnlyAnnotations,
     },
-    async ({ view, chain, address, track_id: trackId, page, page_size: pageSizeValue }) => {
+    async ({ view, chain, address, track_id: trackId, page, page_size }) => {
+      const pageSizeValue = page_size ?? (view === "delegators" ? 100 : 25);
       if (view === "delegators") {
         if (!address) {
           throw new Error(

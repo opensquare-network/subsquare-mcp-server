@@ -202,6 +202,7 @@ export async function listUserVotes({
   address,
   module,
   type,
+  includesTitle = true,
   page,
   pageSize,
 }) {
@@ -211,7 +212,7 @@ export async function listUserVotes({
     query: {
       page,
       page_size: pageSize,
-      includes_title: 1,
+      ...(includesTitle ? { includes_title: 1 } : {}),
       ...(type === "all" ? {} : { type }),
     },
   });

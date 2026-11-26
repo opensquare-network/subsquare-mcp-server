@@ -1,12 +1,12 @@
 import { z } from "zod";
 import {
+  blockContentsPageSchema,
   listBlockEvents,
   listBlockExtrinsics,
 } from "../../services/statescan/blockContents.js";
 import {
   createStructuredJsonResult,
   readOnlyAnnotations,
-  zeroBasedPaginatedItemsSchema,
 } from "../common.js";
 import { chain } from "./block.js";
 
@@ -62,9 +62,7 @@ export function registerBlockContentsTools(server) {
         ...paginationInputShape,
         ...filterInputShape,
       },
-      outputSchema: zeroBasedPaginatedItemsSchema
-        .partial({ page: true, pageSize: true, total: true })
-        .passthrough(),
+      outputSchema: blockContentsPageSchema.passthrough(),
       annotations: readOnlyAnnotations,
     },
     async ({ kind, ...args }) =>

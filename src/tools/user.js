@@ -12,6 +12,7 @@ import {
 import {
   accountAddress,
   createStructuredJsonResult,
+  includesTitle,
   page,
   pageSize,
   paginatedItemsSchema,
@@ -126,7 +127,7 @@ export function registerUserTools(server) {
     "list_user_voting",
     {
       description:
-        "List a Subsquare user's votes or vote calls in one voting module, with pagination. kind=votes optionally filters by vote type. Hydration supports only OpenGov votes (kind=votes, module=referenda).",
+        "List a Subsquare user's votes or vote calls in one voting module, with pagination. For kind=votes, optionally filter by vote type or set includes_title=false to omit proposal metadata. Hydration supports only OpenGov votes (kind=votes, module=referenda).",
       inputSchema: z
         .object({
           chain: z
@@ -144,6 +145,9 @@ export function registerUserTools(server) {
             .describe(
               "Only for kind=votes: vote type filter (default all, no filter)",
             ),
+          includes_title: includesTitle.describe(
+            "Only for kind=votes: include proposal titles and states (default true); set false to omit",
+          ),
           page,
           page_size: userPageSize(25),
         })
@@ -151,19 +155,40 @@ export function registerUserTools(server) {
       outputSchema: userListOutputSchema,
       annotations: readOnlyAnnotations,
     },
-    async ({ chain, address, kind, module, type, page, page_size: pageSize }) => {
+    async ({
+      chain,
+      address,
+      kind,
+      module,
+      type,
+      includes_title: includeTitle,
+      page,
+      page_size: pageSize,
+    }) => {
       if (chain === chains.hydration && (kind !== "votes" || module !== "referenda")) {
         throw new Error(
           "[unsupported_chain] Hydration only supports OpenGov votes. Hint: set kind=votes and module=referenda, or use polkadot or kusama.",
         );
       }
       if (kind === "vote_calls") {
-        rejectUnsupportedArguments("kind=vote_calls", { type }, "Omit type or use kind=votes.");
+        rejectUnsupportedArguments(
+          "kind=vote_calls",
+          { type, includes_title: includeTitle },
+          "Use type and includes_title only for kind=votes.",
+        );
       }
 
       return withUserErrorResult({ chain, address }, () =>
         kind === "votes"
-          ? listUserVotes({ chain, address, module, type: type ?? "all", page, pageSize })
+          ? listUserVotes({
+              chain,
+              address,
+              module,
+              type: type ?? "all",
+              includesTitle: includeTitle,
+              page,
+              pageSize,
+            })
           : listUserVoteCalls({ chain, address, module, page, pageSize }),
       );
     },

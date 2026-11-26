@@ -1,6 +1,10 @@
 import omit from "lodash/omit.js";
 import pick from "lodash/pick.js";
 import { getStateScanConfig } from "../../config/chains.js";
+import {
+  requirePaginatedResponse,
+  zeroBasedPaginatedItemsSchema,
+} from "../../utils/pagination.js";
 import { request } from "../api.js";
 import { resolveItemIdentities } from "../identity.js";
 
@@ -15,7 +19,12 @@ export async function listAccountExtrinsics({
     new URL(`accounts/${encodeURIComponent(address)}/extrinsics`, apiUrl),
     { page, page_size: pageSize },
   );
-  const items = (result?.items ?? []).map((extrinsic) => ({
+  const response = requirePaginatedResponse(
+    result,
+    "StateScan account extrinsics",
+    zeroBasedPaginatedItemsSchema,
+  );
+  const items = response.items.map((extrinsic) => ({
     ...pick(extrinsic, ["section", "method", "signer", "isSuccess"]),
     indexer: pick(extrinsic.indexer, [
       "blockHeight",
@@ -29,7 +38,7 @@ export async function listAccountExtrinsics({
   }));
   const identities = await resolveItemIdentities(chain, items);
   return {
-    ...pick(result, ["page", "pageSize", "total"]),
+    ...pick(response, ["page", "pageSize", "total"]),
     items,
     identities,
   };
@@ -46,7 +55,12 @@ export async function listAccountTransfers({
     new URL(`accounts/${encodeURIComponent(address)}/transfers`, apiUrl),
     { page, page_size: pageSize },
   );
-  const items = (result?.items ?? []).map((transfer) => ({
+  const response = requirePaginatedResponse(
+    result,
+    "StateScan account transfers",
+    zeroBasedPaginatedItemsSchema,
+  );
+  const items = response.items.map((transfer) => ({
     ...omit(transfer, ["indexer", "isSigned"]),
     indexer: pick(transfer.indexer, [
       "blockHeight",
@@ -61,7 +75,7 @@ export async function listAccountTransfers({
   }));
   const identities = await resolveItemIdentities(chain, items);
   return {
-    ...pick(result, ["page", "pageSize", "total"]),
+    ...pick(response, ["page", "pageSize", "total"]),
     items,
     identities,
   };

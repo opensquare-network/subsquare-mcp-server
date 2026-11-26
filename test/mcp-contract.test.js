@@ -56,6 +56,46 @@ test("Hydration routes only OpenGov votes and applies their vote type", async (t
   assert.equal(get.mock.callCount(), 1);
 });
 
+test("user vote title enrichment can be disabled without changing vote calls", async (t) => {
+  const get = t.mock.method(request, "get", async () => emptyPage);
+  const client = await connect(t);
+  const votes = { address, module: "referenda", kind: "votes" };
+
+  await call(client, "list_user_voting", { ...votes, includes_title: false });
+  await call(client, "list_user_voting", votes);
+  await call(client, "list_user_voting", { ...votes, kind: "vote_calls" });
+
+  const path = `/users/${address}/referenda`;
+  assert.deepEqual(
+    get.mock.calls.map(({ arguments: [url] }) => [
+      url.pathname,
+      url.searchParams.get("includes_title"),
+    ]),
+    [[`${path}/votes`, null], [`${path}/votes`, "1"], [`${path}/vote-calls`, "1"]],
+  );
+});
+
+test("delegation views preserve their original default page sizes", async (t) => {
+  t.mock.method(request, "get", async (url, query) => {
+    if (url.pathname === `/users/${address}/referenda/delegators`) {
+      return [];
+    }
+    assert.ok(
+      ["/delegation/referenda/delegates", "/referenda/tracks/0/delegators"].includes(url.pathname),
+    );
+    return { ...emptyPage, page: query.page, pageSize: query.page_size };
+  });
+  const client = await connect(t);
+  const list = (args) => call(client, "opengov_list_delegations", { chain: "polkadot", ...args });
+
+  assert.equal((await list({ view: "delegates" })).pageSize, 25);
+  assert.equal((await list({ view: "track", track_id: 0 })).pageSize, 25);
+  assert.equal((await list({ view: "delegators", address })).pageSize, 100);
+  const custom = await list({ view: "track", track_id: 0, page: 2, page_size: 10 });
+  assert.equal(custom.page, 2);
+  assert.equal(custom.pageSize, 10);
+});
+
 test("Collectives proposer errors point to a working Fellowship query", async (t) => {
   const get = t.mock.method(request, "get", async (url) => {
     assert.equal(url.hostname, "collectives-api.subsquare.io");
@@ -243,6 +283,47 @@ test("Treasury project listing is compact and the ID resolves to linked details"
   assert.deepEqual(JSON.parse(detail.content[0].text), detail.structuredContent);
 });
 
+test("paginated Treasury, bounty, and Fellowship modes reject incomplete upstream pages", async (t) => {
+  const chain = "polkadot";
+  const cases = [
+    ["treasury_list", { chain, kind: "tips" }, "/treasury/tips", "items"],
+    ["treasury_get", { chain, view: "burn" }, "/treasury/burnt", "pageSize"],
+    [
+      "bounties_list",
+      { chain, bounty_type: "multi_asset", status: "inactive" },
+      "/treasury/multi-asset-bounties/inactive",
+      "total",
+    ],
+    ["fellowship_list", { kind: "applications" }, "/fellowship/applications", "items"],
+  ];
+  const pages = new Map(cases.map(([, , path, field]) => {
+    const page = { ...emptyPage };
+    delete page[field];
+    return [path, page];
+  }));
+  t.mock.method(request, "get", async (url) => {
+    if (url.pathname === "/treasury/burnt/summary") {
+      return { totalBurnt: "0" };
+    }
+    assert.ok(pages.has(url.pathname), `Unexpected page endpoint: ${url.pathname}`);
+    return pages.get(url.pathname);
+  });
+  const client = await connect(t);
+
+  for (const [name, args, path, field] of cases) {
+    await expectToolError(
+      client,
+      name,
+      args,
+      new RegExp(`\\[invalid_upstream_response\\].*${field}:`),
+    );
+    pages.set(path, emptyPage);
+    const result = await call(client, name, args);
+    const expected = name === "treasury_get" ? { ...emptyPage, totalBurnt: "0" } : emptyPage;
+    assert.deepEqual(JSON.parse(JSON.stringify(result)), expected);
+  }
+});
+
 test("account assets and activity use their own pagination parameters", async (t) => {
   const post = t.mock.method(request, "post", async (_url, { variables }) => {
     assert.deepEqual(variables, { address, limit: 5, offset: 15 });
@@ -271,12 +352,43 @@ test("account assets and activity use their own pagination parameters", async (t
   assert.equal(transferPage.page, 0);
 });
 
+test("StateScan validates page fields while block lists may omit total", async (t) => {
+  const chain = "polkadot";
+  const blockPage = { page: 0, pageSize: 10, items: [] };
+  let events = { page: 0, items: [] };
+  t.mock.method(request, "get", async (url) => {
+    if (url.pathname === "/events") {
+      return events;
+    }
+    assert.equal(url.pathname, `/accounts/${address}/transfers`);
+    return { page: 0, pageSize: 25, total: 0 };
+  });
+  t.mock.method(request, "post", async () => ({
+    data: { accountAssets: { limit: 25, offset: 0, total: 0 } },
+  }));
+  const client = await connect(t);
+  const blocks = { chain, kind: "events" };
+
+  await expectToolError(client, "block_list", blocks, /\[invalid_upstream_response\].*pageSize:/);
+  events = blockPage;
+  assert.deepEqual(await call(client, "block_list", blocks), { ...blockPage, identities: {} });
+
+  await expectToolError(
+    client, "account_list", { chain, address, kind: "transfers" }, /\[invalid_upstream_response\].*items:/,
+  );
+  await expectToolError(
+    client, "account_list", { chain: "polkadotAssetHub", address, kind: "assets" },
+    /\[invalid_upstream_response\].*holders:/,
+  );
+});
+
 test("merged modes reject arguments they cannot apply, even when set to false or zero", async (t) => {
   const get = t.mock.method(request, "get", () => assert.fail("Unexpected upstream call"));
   const client = await connect(t);
   const chain = "polkadot";
   const cases = [
     ["list_user_voting", { chain, address, module: "referenda", kind: "vote_calls", type: "aye" }, "type"],
+    ["list_user_voting", { chain, address, module: "referenda", kind: "vote_calls", includes_title: false }, "includes_title"],
     ["treasury_get", { chain, view: "status", include_history: false }, "include_history"],
     ["bounties_list", { chain, bounty_type: "multi_asset", page: 1 }, "page"],
     ["bounties_get", { chain, bounty_type: "multi_asset", bounty_id: 0, include_statistics: false }, "include_statistics"],
@@ -288,6 +400,18 @@ test("merged modes reject arguments they cannot apply, even when set to false or
   for (const [name, args, invalidArg] of cases) {
     await expectToolError(client, name, args, new RegExp(`\\[unsupported_filter\\].*${invalidArg}`));
   }
+  assert.equal(get.mock.callCount(), 0);
+});
+
+test("non-paginated Secretary and Fellowship Treasury tools reject pagination", async (t) => {
+  const get = t.mock.method(request, "get", () => assert.fail("Unexpected upstream call"));
+  const client = await connect(t);
+  await expectToolError(
+    client, "secretary_list", { kind: "members", page: 2 }, /Input validation error.*page/,
+  );
+  await expectToolError(
+    client, "fellowship_treasury_get", { view: "status", page: 2 }, /Input validation error.*page/,
+  );
   assert.equal(get.mock.callCount(), 0);
 });
 

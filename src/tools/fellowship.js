@@ -328,11 +328,11 @@ export function registerFellowshipTools(server) {
     {
       description:
         "Get Fellowship Treasury data on Polkadot Collectives. view=balance returns DOT/HOLLAR Treasury and USDT/HOLLAR salary balances; view=status returns active and total spend counts.",
-      inputSchema: {
+      inputSchema: z.object({
         view: z
           .enum(["balance", "status"])
           .describe("Treasury view to return: balance or status"),
-      },
+      }).strict(),
       outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { supportedChains } from "../config/chains.js";
 
+export { paginatedItemsSchema, zeroBasedPaginatedItemsSchema } from "../utils/pagination.js";
+
 export const page = z
   .number()
   .int()
@@ -35,17 +37,6 @@ export function rejectUnsupportedArguments(mode, args, hint = "Remove these argu
     );
   }
 }
-
-export const paginatedItemsSchema = z.object({
-  items: z.array(z.object({}).passthrough()),
-  page: z.number().int().positive(),
-  pageSize: z.number().int().positive(),
-  total: z.number().int().nonnegative(),
-});
-
-export const zeroBasedPaginatedItemsSchema = paginatedItemsSchema.extend({
-  page: z.number().int().nonnegative(),
-});
 
 // Structured content is still returned; the schema stays permissive for deep or
 // fast-moving payloads so tools/list stays small.

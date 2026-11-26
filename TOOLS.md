@@ -9,6 +9,9 @@ Conventions:
 - All tools are read-only. Most paginated lists take `page` / `page_size` starting at page 1.
   `block_list` and account extrinsics/transfers start at page 0. Account assets and Coretime
   list queries take `limit` / `offset`; Vesting accounts take `limit` / `cursor`.
+- Paginated Treasury, bounty, Fellowship feed/application, and StateScan queries return
+  an error for incomplete upstream pages. A valid page can be empty, and StateScan block
+  lists do not require a `total`.
 - `chain` accepts only the chains listed for the tool; unsupported combinations fail fast
   with an actionable error.
 - Arguments that do not apply to the selected record type are rejected with an actionable
@@ -24,7 +27,7 @@ Conventions:
 | `opengov_referendum_detail` | — | Get one referendum's full details. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `opengov_list_tracks` | — | List track IDs, names, active referendum counts, and detail URLs. Collectives returns Fellowship tracks. | Polkadot, Kusama, Hydration, Polkadot Collectives |
 | `list_referendum_comments` | `referendum_type` = `opengov` \| `fellowship` \| `ambassador` | List referendum comments, optionally merged with Polkassembly comments, with reactions and nested replies. | OpenGov: Polkadot, Kusama, Hydration. Fellowship: Polkadot Collectives, Kusama. Ambassador: Polkadot Collectives |
-| `opengov_list_delegations` | `view` = `delegates` \| `delegators` \| `track` | List delegates with statistics, one delegate's delegators (`address`), or delegation relationships for one `track_id`. | Polkadot, Kusama, Hydration |
+| `opengov_list_delegations` | `view` = `delegates` \| `delegators` \| `track` | List delegates with statistics, one delegate's delegators (`address`), or delegation relationships for one `track_id`. `page_size` defaults to 100 for `delegators`, 25 for the other views. | Polkadot, Kusama, Hydration |
 
 ## Democracy, Council, and Technical Committee
 
@@ -54,7 +57,7 @@ Conventions:
 | `fellowship_get_member_detail` | — | Get a member profile with evidence, salary claims, submitted referenda, votes, and salary/rank statistics. |
 | `fellowship_list_address_activity` | `kind` = `referenda` \| `votes` | List Fellowship referenda submitted by an address, or its votes (`type` = `aye` \| `nay`). |
 | `fellowship_salary` | `kind` = `overview` \| `by_rank` \| `rank_changes` \| `member` \| `claimants` | Salary spending by cycle or by rank, rank-change counts, one address's salary statistics (`address`), or all claimants. |
-| `fellowship_treasury_get` | `view` = `balance` \| `status` | Get Treasury DOT/HOLLAR and salary USDT/HOLLAR balances, or active and total spend counts. |
+| `fellowship_treasury_get` | `view` = `balance` \| `status` | Get Treasury DOT/HOLLAR and salary USDT/HOLLAR balances, or active and total spend counts. Does not accept pagination. |
 | `fellowship_treasury_list_spends` | — | List Fellowship Treasury spends with amounts, state, and detail URLs. |
 | `fellowship_treasury_get_spend` | — | Get one spend's beneficiary, related referendum, and markdown content. |
 
@@ -62,7 +65,7 @@ Conventions:
 
 | Tool | Enum | Description | Chains |
 | --- | --- | --- | --- |
-| `secretary_list` | `kind` = `members` \| `cycles` \| `statistics` | List current members with rank and configured salary, list salary cycles, or summarize salary and interim funding by asset and address. | Polkadot Collectives |
+| `secretary_list` | `kind` = `members` \| `cycles` \| `statistics` | List current members with rank and configured salary, list salary cycles, or summarize salary and interim funding by asset and address. Does not accept pagination. | Polkadot Collectives |
 
 ## Posts, Accounts, Blocks, and Identities
 
@@ -82,7 +85,7 @@ Conventions:
 | `get_user_overview` | — | Get a user profile, submission counts, and selected module vote statistics. | Polkadot, Kusama |
 | `get_user_vote_stats` | — | Get vote statistics for selected `modules` without fetching the user's profile or submission counts. | Polkadot, Kusama |
 | `list_user_submissions` | — | List a user's submissions for one mapped category. | Polkadot, Kusama |
-| `list_user_voting` | `kind` = `votes` \| `vote_calls` | List a user's votes or vote calls in one voting module. `type` applies only to `kind=votes`. | Polkadot, Kusama; Hydration only for `kind=votes, module=referenda` |
+| `list_user_voting` | `kind` = `votes` \| `vote_calls` | List a user's votes or vote calls in one voting module. `type` and `includes_title` apply only to `kind=votes`. Titles and states are included by default; set `includes_title: false` to omit them. | Polkadot, Kusama; Hydration only for `kind=votes, module=referenda` |
 
 ## Vesting and Coretime
 

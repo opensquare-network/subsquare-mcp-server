@@ -31,11 +31,11 @@ export function registerSecretaryTools(server) {
     {
       description:
         "List Polkadot Secretary data on Polkadot Collectives. kind selects the record set: members (current roster with rank and configured salary), cycles (salary cycles with payment status), or statistics (salary spending summary and per-address breakdown).",
-      inputSchema: {
+      inputSchema: z.object({
         kind: z
           .enum(Object.keys(SECRETARY_KINDS))
           .describe("Record set to return: members, cycles, or statistics"),
-      },
+      }).strict(),
       outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },

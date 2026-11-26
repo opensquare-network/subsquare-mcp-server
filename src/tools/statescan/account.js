@@ -58,7 +58,7 @@ export function registerAccountTools(server) {
           .describe("Items to skip for assets and foreign_assets (default 0)"),
       }).strict(),
       outputSchema: zeroBasedPaginatedItemsSchema
-        .partial({ page: true, pageSize: true, total: true })
+        .partial({ page: true, pageSize: true })
         .extend({
           limit: z.number().int().positive().optional(),
           offset: z.number().int().nonnegative().optional(),

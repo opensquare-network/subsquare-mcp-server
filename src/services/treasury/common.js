@@ -1,6 +1,7 @@
 import { chains } from "../../config/chain.js";
 import { getChainConfig } from "../../config/chains.js";
 import { formatAmount } from "../../utils/amount.js";
+import { requirePaginatedResponse } from "../../utils/pagination.js";
 import { request } from "../api.js";
 import { createIdentityResolver } from "../identity.js";
 
@@ -44,15 +45,15 @@ export async function listTreasuryItems(
     request.get(createTreasuryUrl(path, chain), query),
     request.get(createTreasuryUrl(TREASURY_SUMMARY_API_PATH, chain)),
   ]);
-  const statistics = summary[statisticKey];
-
-  if (!Array.isArray(response?.items) || !statistics) {
-    throw new Error("SubSquare Treasury list response did not include items");
+  const { items } = requirePaginatedResponse(response, `SubSquare ${path}`);
+  const statistics = summary?.[statisticKey];
+  if (!statistics) {
+    throw new Error(`SubSquare Treasury summary did not include ${statisticKey}`);
   }
 
   const resolveIdentity = await createIdentityResolver({
     chain,
-    addresses: response.items.flatMap((item) => [
+    addresses: items.flatMap((item) => [
       item.proposer,
       item.beneficiary,
     ]),
@@ -60,7 +61,7 @@ export async function listTreasuryItems(
 
   return {
     ...response,
-    items: response.items.map((item) =>
+    items: items.map((item) =>
       createItem(item, resolveIdentity, chain),
     ),
     statistics: {

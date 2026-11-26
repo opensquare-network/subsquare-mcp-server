@@ -1,4 +1,5 @@
 import pick from "lodash/pick.js";
+import { requirePaginatedResponse } from "../../utils/pagination.js";
 import { request } from "../api.js";
 import { createIdentityResolver } from "../identity.js";
 import { createTreasuryItemUrl, createTreasuryUrl } from "./common.js";
@@ -31,16 +32,19 @@ export async function listTreasuryTips({ chain, ...query } = {}) {
     createTreasuryUrl(TREASURY_TIPS_API_PATH, chain),
     { ...query, simple: true },
   );
-  const items = Array.isArray(response?.items) ? response.items : [];
+  const { items, page, pageSize, total } = requirePaginatedResponse(
+    response,
+    "SubSquare Treasury tips",
+  );
   const resolveIdentity = await createIdentityResolver({
     chain,
     addresses: items.flatMap((item) => [item.finder, item.beneficiary]),
   });
 
   return {
-    page: response?.page,
-    pageSize: response?.pageSize,
-    total: response?.total,
+    page,
+    pageSize,
+    total,
     items: items.map((item) => ({
       ...pick(item, TREASURY_TIP_FIELDS),
       state: item.state?.state ?? null,
