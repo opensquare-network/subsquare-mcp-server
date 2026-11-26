@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { subsquareApiChains } from "../config/chains.js";
 import {
+  getReferendaSummary,
   getReferendum,
   listReferenda,
   listTracks,
@@ -84,7 +85,7 @@ export function registerOpengovTools(server) {
     "opengov_list_referenda",
     {
       description:
-        "List and filter OpenGov referenda, or list one proposer's referenda with proposer. Set include_summary to also get chain-wide state counts; summaryStatus distinguishes available, not_requested, and unavailable.",
+        "List and filter OpenGov referenda, or list one proposer's referenda with proposer. Set include_summary to also get chain-wide state counts; summaryStatus distinguishes available, not_requested, and unavailable. For counts alone, use opengov_referenda_summary.",
       inputSchema: z.object(referendaListInputSchema).strict(),
       outputSchema: paginatedItemsSchema
         .extend({
@@ -95,6 +96,18 @@ export function registerOpengovTools(server) {
       annotations: readOnlyAnnotations,
     },
     async (args) => createStructuredJsonResult(await listReferenda(args)),
+  );
+
+  server.registerTool(
+    "opengov_referenda_summary",
+    {
+      description:
+        "Get chain-wide referendum state counts without listing referenda. Counts are cached for one minute. On collectives, returns Fellowship counts.",
+      inputSchema: z.object({ chain }).strict(),
+      outputSchema: permissiveOutputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async (args) => createStructuredJsonResult(await getReferendaSummary(args)),
   );
 
   server.registerTool(

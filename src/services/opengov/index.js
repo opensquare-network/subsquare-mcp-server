@@ -21,10 +21,14 @@ const referendaSummaries = new LRUCache({
   },
 });
 
+export function getReferendaSummary({ chain }) {
+  return referendaSummaries.fetch(chain);
+}
+
 async function loadReferendaSummary(chain) {
   try {
     return {
-      summary: await referendaSummaries.fetch(chain),
+      summary: await getReferendaSummary({ chain }),
       summaryStatus: "available",
     };
   } catch (error) {

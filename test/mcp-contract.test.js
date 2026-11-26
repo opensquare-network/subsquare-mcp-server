@@ -113,6 +113,104 @@ test("referenda summaries are opt-in, reused by chain, and explicitly unavailabl
   assert.equal(warn.mock.callCount(), 1);
 });
 
+test("standalone referenda summary skips a failing list and shares the summary cache", async (t) => {
+  const chain = "collectives";
+  const listPath = "/fellowship/referenda";
+  const summaryPath = `${listPath}/summary`;
+  const summary = { approved: 3 };
+  const get = t.mock.method(request, "get", async (url) => {
+    if (url.pathname === summaryPath) {
+      return summary;
+    }
+    if (url.pathname === listPath) {
+      throw new ApiRequestError("Fixture referenda list unavailable", { status: 503 });
+    }
+    assert.equal(url.pathname, "/gov2/referendums/summary");
+    throw new ApiRequestError("Fixture summary unavailable", { status: 503 });
+  });
+  const client = await connect(t);
+
+  assert.deepEqual(await call(client, "opengov_referenda_summary", { chain }), summary);
+  assert.equal(get.mock.callCount(), 1);
+  await expectToolError(
+    client,
+    "opengov_list_referenda",
+    { chain, include_summary: true },
+    /Fixture referenda list unavailable/,
+  );
+  await expectToolError(
+    client,
+    "opengov_referenda_summary",
+    { chain: "hydration" },
+    /Fixture summary unavailable/,
+  );
+  assert.deepEqual(
+    get.mock.calls.map((entry) => entry.arguments[0].pathname),
+    [summaryPath, listPath, "/gov2/referendums/summary"],
+  );
+});
+
+test("standalone user vote stats do not load profile or counts", async (t) => {
+  const statsPath = `/users/${address}/referenda/vote-stats`;
+  const source = `https://polkadot-api.subsquare.io${statsPath}`;
+  const stats = { aye: 7 };
+  let statsUnavailable = false;
+  const get = t.mock.method(request, "get", async (url) => {
+    if (url.toString() !== source) {
+      throw new ApiRequestError("Fixture user profile or counts unavailable", { status: 503 });
+    }
+    if (statsUnavailable) {
+      throw new ApiRequestError("Fixture vote stats unavailable", { status: 503 });
+    }
+    return stats;
+  });
+  const client = await connect(t);
+  const args = { address, modules: ["referenda"] };
+
+  assert.deepEqual(await call(client, "get_user_vote_stats", args), {
+    chain: "polkadot",
+    address,
+    detail: `https://polkadot.subsquare.io/users/${address}`,
+    source: [source],
+    pagination: null,
+    data: { voteStats: { referenda: { supported: true, source, data: stats } } },
+  });
+  statsUnavailable = true;
+  await expectToolError(client, "get_user_vote_stats", args, /Fixture vote stats unavailable/);
+  assert.deepEqual(get.mock.calls.map((entry) => entry.arguments[0].toString()), [source, source]);
+});
+
+test("standalone native bounty statistics do not load bounty details", async (t) => {
+  const statsPath = "/treasury/bounties/0/statistics";
+  const statistics = { bountyId: 0, categories: {}, curators: {}, beneficiaries: {} };
+  let statsUnavailable = false;
+  const get = t.mock.method(request, "get", async (url) => {
+    assert.equal(url.hostname, "polkadot-api.subsquare.io");
+    if (url.pathname !== statsPath) {
+      throw new ApiRequestError("Fixture bounty details unavailable", { status: 503 });
+    }
+    if (statsUnavailable) {
+      throw new ApiRequestError("Fixture bounty statistics unavailable", { status: 503 });
+    }
+    return statistics;
+  });
+  const client = await connect(t);
+  const args = { bounty_index: 0 };
+
+  assert.deepEqual(await call(client, "bounties_get_bounty_statistics", args), { statistics });
+  statsUnavailable = true;
+  await expectToolError(
+    client,
+    "bounties_get_bounty_statistics",
+    args,
+    /Fixture bounty statistics unavailable/,
+  );
+  assert.deepEqual(
+    get.mock.calls.map((entry) => entry.arguments[0].pathname),
+    [statsPath, statsPath],
+  );
+});
+
 test("Treasury project listing is compact and the ID resolves to linked details", async (t) => {
   const get = t.mock.method(request, "get", async (url) => {
     switch (url.pathname) {

@@ -22,6 +22,16 @@ import {
 const bountyChain = z
   .enum(bountyChains)
   .describe("Bounties chain to query: polkadot or kusama");
+const bountyIndexSchema = z.number().int().nonnegative();
+const payoutRecord = z.record(z.unknown());
+const bountyStatisticsSchema = z
+  .object({
+    bountyId: bountyIndexSchema,
+    categories: payoutRecord,
+    curators: payoutRecord,
+    beneficiaries: payoutRecord,
+  })
+  .passthrough();
 
 const BOUNTY_TYPES = ["native", "multi_asset", "multi_asset_child"];
 const CHILD_STATUSES = [
@@ -148,16 +158,13 @@ export function registerBountiesTools(server) {
     "bounties_get",
     {
       description:
-        "Get one bounty. bounty_type selects the record: native (requires bounty_index; optional include_statistics, which returns statistics: null when the API has none), multi_asset (requires bounty_id), or multi_asset_child (requires parent_bounty_id and child_bounty_index, optional block_height).",
+        "Get one bounty. bounty_type selects the record: native (requires bounty_index; optional include_statistics, which returns statistics: null when the API has none), multi_asset (requires bounty_id), or multi_asset_child (requires parent_bounty_id and child_bounty_index, optional block_height). For native payout statistics alone, use bounties_get_bounty_statistics.",
       inputSchema: z.object({
         chain: bountyChain,
         bounty_type: z
           .enum(BOUNTY_TYPES)
           .describe("Record type to fetch: native, multi_asset, or multi_asset_child"),
-        bounty_index: z
-          .number()
-          .int()
-          .nonnegative()
+        bounty_index: bountyIndexSchema
           .optional()
           .describe("Required for bounty_type=native: exact bounty index"),
         bounty_id: z
@@ -274,5 +281,23 @@ export function registerBountiesTools(server) {
         }),
       );
     },
+  );
+
+  server.registerTool(
+    "bounties_get_bounty_statistics",
+    {
+      description:
+        "Get payout statistics for one native bounty without loading bounty details or its on-chain balance.",
+      inputSchema: z
+        .object({
+          chain: bountyChain.optional().describe("Bounties chain to query; defaults to polkadot"),
+          bounty_index: bountyIndexSchema.describe("Exact native bounty index; zero is valid"),
+        })
+        .strict(),
+      outputSchema: { statistics: bountyStatisticsSchema },
+      annotations: readOnlyAnnotations,
+    },
+    async (args) =>
+      createStructuredJsonResult({ statistics: await getBountyStatistics(args) }),
   );
 }

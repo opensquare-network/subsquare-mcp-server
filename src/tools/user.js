@@ -3,6 +3,7 @@ import { chains } from "../config/chain.js";
 import {
   USER_CATEGORY_API_PATHS,
   getUserOverview,
+  getUserVoteStats,
   listUserSubmissions,
   listUserVoteCalls,
   listUserVotes,
@@ -26,11 +27,17 @@ const userChains = z
 const userAddress = accountAddress.describe(
   "SS58 address whose Subsquare user records should be queried",
 );
-const userModules = z
-  .array(z.enum(["referenda", "democracy", "fellowship"]))
-  .min(1)
-  .default(["referenda", "democracy", "fellowship"])
-  .describe("Voting modules to include");
+const userModulesInputSchema = z
+  .object({
+    chain: userChains,
+    address: userAddress,
+    modules: z
+      .array(z.enum(["referenda", "democracy", "fellowship"]))
+      .min(1)
+      .default(["referenda", "democracy", "fellowship"])
+      .describe("Voting modules to include"),
+  })
+  .strict();
 const userPageSize = (defaultValue) =>
   pageSize
     .default(defaultValue)
@@ -67,14 +74,8 @@ export function registerUserTools(server) {
     "get_user_overview",
     {
       description:
-        "Get a Subsquare user profile, submission counts, and selected module vote statistics.",
-      inputSchema: z
-        .object({
-          chain: userChains,
-          address: userAddress,
-          modules: userModules,
-        })
-        .strict(),
+        "Get a Subsquare user profile, submission counts, and selected module vote statistics. For vote statistics alone, use get_user_vote_stats.",
+      inputSchema: userModulesInputSchema,
       outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
@@ -82,6 +83,18 @@ export function registerUserTools(server) {
       withUserErrorResult({ chain, address }, () =>
         getUserOverview({ chain, address, modules }),
       ),
+  );
+
+  server.registerTool(
+    "get_user_vote_stats",
+    {
+      description:
+        "Get a Subsquare user's vote statistics for selected voting modules without loading the profile or submission counts.",
+      inputSchema: userModulesInputSchema,
+      outputSchema: permissiveOutputSchema,
+      annotations: readOnlyAnnotations,
+    },
+    async (args) => createStructuredJsonResult(await getUserVoteStats(args)),
   );
 
   server.registerTool(

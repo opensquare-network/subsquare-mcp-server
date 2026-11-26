@@ -168,6 +168,19 @@ export async function getUserOverview({ chain, address, modules }) {
   });
 }
 
+export async function getUserVoteStats({ chain, address, modules }) {
+  const voteStats = await fetchVoteStatsMap({ chain, address }, modules);
+
+  return createUserResponse({
+    chain,
+    address,
+    detail: buildUserDetailUrl(chain, buildUserPath(address)),
+    source: Object.values(voteStats).map((voteStat) => voteStat.source),
+    pagination: null,
+    data: { voteStats },
+  });
+}
+
 export async function listUserSubmissions({
   chain,
   address,
