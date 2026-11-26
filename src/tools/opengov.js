@@ -114,7 +114,7 @@ export function registerOpengovTools(server) {
     "opengov_referendum_detail",
     {
       description:
-        "Get the full details of one OpenGov referendum by its index. Set resolve_preimage to also return the proposal's decoded preimage, including nested batched calls, or null if unavailable.",
+        "Get the full details of one OpenGov referendum by its index. Set resolve_preimage to include the proposal's stored preimage, with decoded calls when available. Preimage is null if there is no proposal hash or the hash is not indexed.",
       inputSchema: z.object({
         chain,
         referendum_index: z
@@ -125,7 +125,7 @@ export function registerOpengovTools(server) {
         resolve_preimage: z
           .boolean()
           .default(false)
-          .describe("Fetch the decoded proposal preimage (default false)"),
+          .describe("Fetch the stored proposal preimage (default false)"),
       }).strict(),
       outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,

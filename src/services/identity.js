@@ -2,10 +2,12 @@ import { getSs58AddressInfo } from "polkadot-api";
 import { LRUCache } from "lru-cache";
 import isNil from "lodash/isNil.js";
 import pick from "lodash/pick.js";
-import { getIdentityConfig } from "../config/chains.js";
-import { request } from "./api.js";
+import { getIdentityConfig, IdentityConfigError } from "../config/chains.js";
+import { ApiRequestError, request } from "./api.js";
 
 const IDENTITY_CACHE_TTL_MS = 5 * 60 * 1000;
+
+class IdentityResponseError extends Error {}
 
 // Identities are read-only and stable within a few minutes, so cache them per
 // chain+address to keep repeated and overlapping lookups off the API. A cached
@@ -23,6 +25,19 @@ function getUniqueAddresses(addresses) {
   return [
     ...new Set(addresses.filter((address) => typeof address === "string")),
   ];
+}
+
+function isValidIdentity(identity) {
+  if (typeof identity?.address !== "string") {
+    return false;
+  }
+
+  const { info } = identity;
+  return info == null || (
+    typeof info === "object" && !Array.isArray(info) &&
+    (info.status === undefined || typeof info.status === "string") &&
+    (info.display === undefined || typeof info.display === "string")
+  );
 }
 
 export function createCompactIdentity(identity) {
@@ -71,9 +86,9 @@ export async function getIdentityMap({ chain, addresses = [] } = {}) {
     },
   );
 
-  if (!Array.isArray(identities)) {
-    throw new Error(
-      "StateScan short identities response did not include identities",
+  if (!Array.isArray(identities) || !identities.every(isValidIdentity)) {
+    throw new IdentityResponseError(
+      "[invalid_upstream_response] StateScan short identities response did not include valid identities",
     );
   }
 
@@ -113,8 +128,7 @@ function collectAddresses(value, addresses = new Set()) {
   return addresses;
 }
 
-export async function resolveItemIdentities(chain, items) {
-  const addresses = [...collectAddresses(items)];
+async function resolveAddressIdentities(chain, addresses) {
   const resolveIdentity = await createIdentityResolver({ chain, addresses });
   const identities = {};
   for (const address of addresses) {
@@ -122,4 +136,32 @@ export async function resolveItemIdentities(chain, items) {
     if (info && Object.keys(info).length > 0) identities[address] = info;
   }
   return identities;
+}
+
+export function resolveItemIdentities(chain, items) {
+  return resolveAddressIdentities(chain, [...collectAddresses(items)]);
+}
+
+export async function resolveOptionalItemIdentities(chain, items) {
+  const addresses = [...collectAddresses(items)];
+  if (addresses.length === 0) {
+    return { identities: {}, identityStatus: "not_applicable" };
+  }
+
+  try {
+    const identities = await resolveAddressIdentities(chain, addresses);
+    return { identities, identityStatus: "available" };
+  } catch (error) {
+    if (
+      !(error instanceof IdentityConfigError) &&
+      !(error instanceof ApiRequestError) &&
+      !(error instanceof IdentityResponseError) &&
+      !(error instanceof SyntaxError)
+    ) {
+      throw error;
+    }
+
+    console.warn(`Unable to query ${chain} identities:`, error.message);
+    return { identities: {}, identityStatus: "unavailable" };
+  }
 }

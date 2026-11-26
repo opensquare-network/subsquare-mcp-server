@@ -1,6 +1,7 @@
+import { z } from "zod";
 import { getApprovalPercent, toPercent } from "../../utils/percentage.js";
 import { ApiRequestError, request } from "../api.js";
-import { resolveItemIdentities } from "../identity.js";
+import { resolveOptionalItemIdentities } from "../identity.js";
 import { getReferendumVoteEndpoints } from "../opengov/paths.js";
 
 const SPLIT_BALANCE_FIELDS = [
@@ -9,6 +10,30 @@ const SPLIT_BALANCE_FIELDS = [
   "abstainBalance",
 ];
 const SPLIT_VOTES_FIELDS = ["ayeVotes", "nayVotes", "abstainVotes"];
+
+const amount = z.string().regex(/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/).nullable();
+const addressCount = z.number().int().nonnegative().nullable();
+const ratio = z.number().finite().nonnegative().nullable();
+const statsFields = {
+  support: amount,
+  electorate: amount,
+  votes: amount,
+  ayes: amount,
+  nays: amount,
+  totalCapital: amount,
+  directCapital: amount,
+  directAddresses: addressCount,
+  delegationCapital: amount,
+  delegationVotes: amount,
+  delegationAddresses: addressCount,
+};
+const upstreamVoteStatsSchema = z.object({ ...statsFields, percentage: ratio }).partial();
+
+export const voteStatsSchema = z.object({
+  ...statsFields,
+  turnoutRatio: ratio,
+  turnoutPercent: ratio,
+});
 
 function toBigInt(value) {
   return BigInt(value ?? 0);
@@ -156,7 +181,7 @@ export async function listReferendumVotes({
   const sortedVotes = [...votesResponse].sort(compareVotes);
   const start = (page - 1) * pageSize;
   const items = sortedVotes.slice(start, start + pageSize);
-  const identities = await resolveItemIdentities(chain, items);
+  const identityResult = await resolveOptionalItemIdentities(chain, items);
 
   return {
     chain,
@@ -170,7 +195,7 @@ export async function listReferendumVotes({
     tallyHistory: includeTallyHistory
       ? compactTallyHistory(tallyResponse, tallyLimit, referendumType)
       : null,
-    identities,
+    ...identityResult,
     items,
     source: votesUrl.toString(),
   };
@@ -196,7 +221,19 @@ async function loadVoteStats(url) {
     return { stats: null, statsStatus: "unavailable" };
   }
 
-  return { stats: compactVoteStats(stats), statsStatus: "available" };
+  const result = upstreamVoteStatsSchema.safeParse(stats);
+  if (!result.success) {
+    const [issue] = result.error.issues;
+    throw new Error(
+      `[invalid_upstream_response] SubSquare vote statistics ${issue.path.join(".")}: ${issue.message}`,
+      { cause: result.error },
+    );
+  }
+  if (!Object.values(result.data).some((value) => value != null)) {
+    throw new Error("[invalid_upstream_response] SubSquare vote statistics contained no usable fields");
+  }
+
+  return { stats: compactVoteStats(result.data), statsStatus: "available" };
 }
 
 function compactVoteStats(stats) {

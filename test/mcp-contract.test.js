@@ -8,7 +8,16 @@ import { ApiRequestError, request } from "../src/services/api.js";
 import { listMultiAssetChildBounties } from "../src/services/treasury/bounties.js";
 
 const address = "fixture-address";
+const polkadotAddress = "12KM5KYi2fBdRoijHVrpPx71buoU5bG8Yq7rVpEG7nrUG6f";
 const emptyPage = { page: 1, pageSize: 25, total: 0, items: [] };
+
+function mockHttp(t) {
+  const agent = new MockAgent();
+  agent.disableNetConnect();
+  t.after(() => agent.close());
+  const dispatch = t.mock.method(EnvHttpProxyAgent.prototype, "dispatch", agent.dispatch.bind(agent));
+  return { agent, dispatch };
+}
 
 async function connect(t) {
   const server = createMcpServer();
@@ -111,6 +120,39 @@ test("delegation views preserve their original default page sizes", async (t) =>
   });
   assert.deepEqual(items, [{
     account: address, trackId: 0, delegatorsCount: 2, delegatedCapital: null, delegatedVotes: "3",
+  }]);
+});
+
+test("track delegatee rankings send the default sort and validate pagination and filters", async (t) => {
+  const get = t.mock.method(request, "get", async (url, query) => {
+    assert.equal(url.href, "https://polkadot-api.subsquare.io/referenda/tracks/0/delegatee");
+    assert.deepEqual(query, {
+      page: 2, page_size: 100, sort: JSON.stringify(["delegatedVotes", "desc"]),
+    });
+    return {
+      page: 2, pageSize: 100, total: 101,
+      items: [{
+        _id: "internal-id", account: address, trackId: 0,
+        delegatorsCount: 3, delegatedCapital: "90071992547409930", delegatedVotes: "90071992547409931",
+      }],
+    };
+  });
+  const client = await connect(t);
+  const args = { chain: "polkadot", view: "track_delegatees" };
+  await expectToolError(client, "opengov_list_delegations", args, /\[missing_track_id\]/);
+  await expectToolError(
+    client, "opengov_list_delegations", { ...args, track_id: 0, address }, /\[unsupported_filter\].*address/,
+  );
+  await expectToolError(
+    client, "opengov_list_delegations", { ...args, track_id: 0, page_size: 101 }, /\[invalid_page_size\]/,
+  );
+  assert.equal(get.mock.callCount(), 0);
+
+  const result = await call(client, "opengov_list_delegations", { ...args, track_id: 0, page: 2, page_size: 100 });
+  assert.deepEqual([result.page, result.pageSize, result.total], [2, 100, 101]);
+  assert.deepEqual(result.items, [{
+    account: address, trackId: 0, delegatorsCount: 3,
+    delegatedCapital: "90071992547409930", delegatedVotes: "90071992547409931",
   }]);
 });
 
@@ -412,6 +454,42 @@ test("paginated Treasury, track delegatee, bounty, and Fellowship modes reject i
   }
 });
 
+test("Treasury beneficiary ranks preserve the two payout estimates and unpaid record counts", async (t) => {
+  const get = t.mock.method(request, "get", async (url, query) => {
+    assert.equal(url.href, "https://polkadot-api.subsquare.io/treasury/beneficiaries");
+    const cases = { total_value: 1, awarded_value: 2 };
+    assert.equal(query.page, cases[query.sort_by]);
+    assert.equal(query.page_size, 1);
+    return {
+      page: query.page, pageSize: 1, total: 2,
+      items: [{
+        address: polkadotAddress,
+        totalBenefitCount: 3, totalBenefitFiatValue: "100.25", totalBenefitFiatValueAtFinal: 80.5,
+        tags: ["fixture"], spends: { benefitCount: 2, benefitFiatValue: 0 },
+      }],
+    };
+  });
+  const client = await connect(t);
+  const args = { chain: "polkadot", kind: "beneficiaries", page_size: 1 };
+  await expectToolError(
+    client, "treasury_list", { ...args, chain: "hydration" }, /\[unsupported_chain\].*polkadot or kusama/,
+  );
+  assert.equal(get.mock.callCount(), 0);
+
+  for (const [page, sort_by] of [[1, "total_value"], [2, "awarded_value"]]) {
+    const result = await call(client, "treasury_list", { ...args, page, sort_by });
+    assert.deepEqual([result.page, result.pageSize, result.total], [page, 1, 2]);
+    const [item] = result.items;
+    assert.deepEqual(item.spends, {
+      benefitCount: 2, benefitFiatValue: 0, benefitFiatValueAtFinal: null,
+    });
+    assert.equal(item.totalBenefitCount, 3);
+    assert.equal(item.totalBenefitFiatValue, "100.25");
+    assert.equal(item.totalBenefitFiatValueAtFinal, 80.5);
+    assert.equal(item.url, `https://polkadot.subsquare.io/user/${polkadotAddress}`);
+  }
+});
+
 test("multi-asset child bounty lookups by ids require an array rather than a page", async (t) => {
   const ids = "1_2_3";
   const item = { parentBountyId: 1, childBountyId: 2 };
@@ -570,6 +648,7 @@ test("tool discovery describes project lookup, pagination, amount units, and Ves
 test("governance search routes both modes and rejects non-Polkadot full-text searches", async (t) => {
   const wikiArticle = { location: "learn/budget/", title: "Budget", content: "Wiki excerpt" };
   const hash = `0x${"a".repeat(64)}`;
+  const longSnippet = "x".repeat(401);
   let fullText = {
     items: [
       { type: "referendaReferendum", referendumIndex: 0, title: "Budget", content: "Account funding" },
@@ -580,6 +659,10 @@ test("governance search routes both modes and rejects non-Polkadot full-text sea
       {
         type: "childBounty", parentBountyId: 2, index: 0,
         hasSameParentAndIndex: true, indexerBlockHeight: 123,
+      },
+      {
+        type: "comment", postType: "referendaReferendum", referendumIndex: 0,
+        height: 8, content: longSnippet, highlight: { title: null, content: "<em>Budget</em>" },
       },
     ],
     projects: [{ id: "nova", name: "Nova", proposals: [{ id: 7 }] }],
@@ -618,7 +701,7 @@ test("governance search routes both modes and rejects non-Polkadot full-text sea
   const args = { chain: "polkadot", mode: "full_text", text: "Budget", max: 4 };
   const result = await client.callTool({ name: "gov_search", arguments: args });
   assert.ok(!result.isError, result.content[0]?.text);
-  const [referendum, firstTip, secondTip, hashOnlyTip, comment, childBounty] =
+  const [referendum, firstTip, secondTip, hashOnlyTip, comment, childBounty, longComment] =
     result.structuredContent.items;
   assert.equal(referendum.content, "Account funding");
   assert.equal(firstTip.url, `https://polkadot.subsquare.io/treasury/tips/10836248_${hash}`);
@@ -627,6 +710,10 @@ test("governance search routes both modes and rejects non-Polkadot full-text sea
   assert.equal(comment.height, 7);
   assert.equal(comment.url, null);
   assert.equal(childBounty.url, "https://polkadot.subsquare.io/treasury/child-bounties/2_0_123");
+  assert.equal(longComment.url, "https://polkadot.subsquare.io/referenda/0#8");
+  assert.match(longComment.content, /^x{400}\u2026$/);
+  assert.equal(longComment.contentTruncated, true);
+  assert.equal(longComment.highlight.content, "<em>Budget</em>");
   assert.deepEqual(result.structuredContent.projects, [{ id: "nova", name: "Nova" }]);
   assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
   fullText = { projects: [], wiki: [] };
@@ -655,6 +742,22 @@ test("keyword search accepts short numeric IDs but not short keywords", async (t
   }
 });
 
+test("governance search distinguishes no matches from invalid result groups", async (t) => {
+  let keywordResponse = { openGovReferenda: [], wiki: [] };
+  t.mock.method(request, "get", async (url) =>
+    url.pathname === "/search" ? keywordResponse : { items: [], projects: [], wiki: [] },
+  );
+  const client = await connect(t);
+  const args = { chain: "polkadot", text: "unmatched term" };
+  const keyword = await call(client, "gov_search", args);
+  assert.deepEqual([keyword.total, keyword.counts, keyword.results], [0, {}, {}]);
+  const fullText = await call(client, "gov_search", { ...args, mode: "full_text" });
+  assert.deepEqual(fullText.counts, { items: 0, projects: 0, wiki: 0 });
+  assert.deepEqual([fullText.items, fullText.projects, fullText.wiki], [[], [], []]);
+  keywordResponse = { openGovReferenda: null };
+  await expectToolError(client, "gov_search", args, /\[invalid_upstream_response\].*groups of results/);
+});
+
 test("referendum vote type selects the route independently of the chain", async (t) => {
   const electorate = "100000000000000000000";
   const totalCapital = "1000000000000000000";
@@ -673,8 +776,14 @@ test("referendum vote type selects the route independently of the chain", async 
           { account: "low", aye: false, balance: "4", votes: "4", conviction: 1 },
           { account: "high", aye: true, balance: "90071992547409930", votes: "90071992547409930", conviction: 1 },
           { account: "delegator", isDelegating: true, balance: "1", votes: "6", conviction: 6 },
-          { account: "split", isSplit: true, balance: "20", votes: "2", conviction: 0 },
-          { account: "abstain", isSplitAbstain: true, balance: "30", votes: "3", conviction: 0 },
+          {
+            account: "split", isSplit: true, conviction: 0,
+            ayeBalance: "10", ayeVotes: "1", nayBalance: "10", nayVotes: "1",
+          },
+          {
+            account: "abstain", isSplitAbstain: true, conviction: 0,
+            ayeBalance: "10", ayeVotes: "1", nayBalance: "0", nayVotes: "0", abstainBalance: "20", abstainVotes: "2",
+          },
         ];
       case "/gov2/referendums/0/vote-stats":
         return { electorate, totalCapital, percentage: 0.01 };
@@ -706,6 +815,7 @@ test("referendum vote type selects the route independently of the chain", async 
   });
   assert.deepEqual(opengov.items.map(({ account }) => account), ["high"]);
   assert.equal(opengov.total, 5);
+  assert.equal(opengov.summary.totalBalance, "90071992547409985");
   assert.equal(opengov.summary.totalVotes, "90071992547409945");
   assert.deepEqual(opengov.summary.convictionCounts, { 0: 2, 1: 2, 6: 1 });
   assert.equal(opengov.stats.electorate, electorate);
@@ -738,14 +848,91 @@ test("referendum vote type selects the route independently of the chain", async 
   );
 });
 
+test("empty vote and tally pages distinguish missing capital from zero votes", async (t) => {
+  let votes = [];
+  t.mock.method(request, "get", async (url) => {
+    if (url.pathname.endsWith("/votes")) return votes;
+    if (url.pathname.endsWith("/vote-stats")) return {};
+    if (url.pathname.endsWith("/tally-history")) return [];
+    assert.fail(`Unexpected vote endpoint: ${url.pathname}`);
+  });
+  const client = await connect(t);
+  const args = {
+    chain: "hydration", referendum_type: "opengov", referendum_index: 0,
+    include_tally_history: true, page: 2, page_size: 1,
+  };
+  const result = await call(client, "list_referendum_votes", args);
+  assert.deepEqual([result.page, result.pageSize, result.total, result.items], [2, 1, 0, []]);
+  assert.equal(result.summary.voters, 0);
+  assert.equal(result.summary.totalBalance, null);
+  assert.equal(result.summary.totalVotes, "0");
+  assert.deepEqual(result.tallyHistory, { total: 0, items: [] });
+  assert.deepEqual([result.statsStatus, result.stats], ["unavailable", null]);
+  assert.deepEqual([result.identityStatus, result.identities], ["not_applicable", {}]);
+  votes = {};
+  await expectToolError(client, "list_referendum_votes", args, /\[invalid_upstream_response\].*votes response/);
+});
+
+test("identity lookup failures do not discard referendum votes or indexed stats", async (t) => {
+  const key = "SUBSQUARE_IDENTITY_SERVER_URL";
+  const original = process.env[key];
+  t.after(() => {
+    if (original === undefined) delete process.env[key];
+    else process.env[key] = original;
+  });
+  delete process.env[key];
+
+  const vote = { account: polkadotAddress, aye: true, votes: "3" };
+  const { agent } = mockHttp(t);
+  const governance = agent.get("https://polkadot-api.subsquare.io");
+  governance.intercept({ path: "/gov2/referenda/0/votes" }).reply(200, [vote]).persist();
+  governance.intercept({ path: "/gov2/referendums/0/vote-stats" })
+    .reply(200, { totalCapital: "3", percentage: 0.01 }).persist();
+  const registry = agent.get("https://identities.example");
+  const lookup = {
+    method: "POST",
+    path: "/polkadot/short-ids",
+  };
+  const info = { status: "Verified", display: "Fixture identity" };
+  registry.intercept(lookup).reply(503, "Identity service unavailable");
+  registry.intercept(lookup).replyWithError(new DOMException("Identity request timed out", "TimeoutError"));
+  registry.intercept(lookup).reply(200, "{");
+  registry.intercept(lookup).reply(200, [{ address: polkadotAddress, info: { display: 20 } }]);
+  registry.intercept(lookup).reply(200, [{ address: polkadotAddress, info }]);
+  const warn = t.mock.method(console, "warn", () => {});
+
+  const client = await connect(t);
+  const args = { chain: "polkadot", referendum_type: "opengov", referendum_index: 0 };
+  async function checkUnavailable(reason) {
+    const result = await call(client, "list_referendum_votes", args);
+    assert.deepEqual(result.items, [vote]);
+    assert.equal(result.summary.totalVotes, "3");
+    assert.equal(result.statsStatus, "available");
+    assert.equal(result.stats.turnoutPercent, 1);
+    assert.deepEqual([result.identityStatus, result.identities], ["unavailable", {}]);
+    assert.match(warn.mock.calls.at(-1).arguments[1], reason);
+  }
+
+  await checkUnavailable(/is not configured/);
+  process.env[key] = "not-a-url";
+  await checkUnavailable(/must be a valid HTTP/);
+  process.env[key] = "https://identities.example";
+  await checkUnavailable(/status 503/);
+  await checkUnavailable(/timed out/);
+  await checkUnavailable(/JSON/);
+  await checkUnavailable(/invalid_upstream_response.*identities/);
+  const recovered = await call(client, "list_referendum_votes", args);
+  assert.deepEqual([recovered.identityStatus, recovered.identities], [
+    "available", { [polkadotAddress]: info },
+  ]);
+  assert.equal(warn.mock.callCount(), 6);
+});
+
 test("OpenGov turnout statistics can be skipped and unavailable stats do not hide votes", async (t) => {
   const votesPath = "/gov2/referenda/0/votes";
   const statsPath = "/gov2/referendums/0/vote-stats";
   const vote = { account: address, aye: true, votes: "3" };
-  const agent = new MockAgent();
-  agent.disableNetConnect();
-  t.after(() => agent.close());
-  const dispatch = t.mock.method(EnvHttpProxyAgent.prototype, "dispatch", agent.dispatch.bind(agent));
+  const { agent, dispatch } = mockHttp(t);
   const upstream = agent.get("https://kusama-api.subsquare.io");
   upstream.intercept({ path: votesPath }).reply(200, [vote]).persist();
   upstream.intercept({ path: statsPath }).reply(503, "Fixture turnout statistics unavailable");
@@ -788,9 +975,65 @@ test("OpenGov turnout statistics can be skipped and unavailable stats do not hid
   assert.equal(warn.mock.callCount(), 3);
 });
 
+test("vote statistics reject unusable payloads but preserve valid partial and zero values", async (t) => {
+  let stats;
+  t.mock.method(request, "get", async (url) => {
+    if (url.pathname === "/gov2/referenda/0/votes") return [];
+    assert.equal(url.pathname, "/gov2/referendums/0/vote-stats");
+    return stats;
+  });
+  const client = await connect(t);
+  const args = { chain: "polkadot", referendum_type: "opengov", referendum_index: 0 };
+  const cases = [
+    [{ unrecognizedField: 1 }, /no usable fields/],
+    [{ percentage: null, totalCapital: null }, /no usable fields/],
+    [{ totalCapital: "unknown", percentage: 0 }, /totalCapital/],
+    [{ directAddresses: -1 }, /directAddresses/],
+    [{ percentage: "0.01" }, /percentage/],
+  ];
+  for (const [response, reason] of cases) {
+    stats = response;
+    await expectToolError(
+      client, "list_referendum_votes", args,
+      new RegExp(`\\[invalid_upstream_response\\].*vote statistics.*${reason.source}`),
+    );
+  }
+
+  stats = { percentage: 0, directAddresses: 0, referendumIndex: 0 };
+  const zero = await call(client, "list_referendum_votes", args);
+  assert.equal(zero.statsStatus, "available");
+  assert.deepEqual([zero.stats.turnoutPercent, zero.stats.directAddresses, zero.stats.electorate], [0, 0, null]);
+  assert.equal(Object.hasOwn(zero.stats, "referendumIndex"), false);
+  stats = { totalCapital: "1.2E+21" };
+  const partial = await call(client, "list_referendum_votes", args);
+  assert.deepEqual([partial.statsStatus, partial.stats.totalCapital, partial.stats.turnoutPercent], [
+    "available", "1.2E+21", null,
+  ]);
+});
+
+test("API request errors distinguish HTTP status from transport failure and preserve the cause", async (t) => {
+  const { agent } = mockHttp(t);
+  const upstream = agent.get("https://polkadot-api.subsquare.io");
+  const url = new URL("/preimages/fixture-hash", "https://polkadot-api.subsquare.io");
+  const reset = Object.assign(new Error("Fixture connection reset"), { code: "ECONNRESET" });
+  upstream.intercept({ path: url.pathname }).reply(404, "  Preimage not found  ");
+  upstream.intercept({ path: url.pathname }).replyWithError(reset);
+
+  await assert.rejects(request.get(url), {
+    name: "ApiRequestError",
+    status: 404,
+    path: "/preimages/fixture-hash",
+    message: "API request failed with status 404: Preimage not found",
+  });
+  await assert.rejects(request.get(url), (error) =>
+    error instanceof ApiRequestError && error.status === null &&
+    error.path === url.pathname && error.cause?.cause === reset,
+  );
+});
+
 test("beneficiary activity normalizes SS58 addresses and validates requested pages", async (t) => {
   const beneficiaryAddresses = {
-    "polkadot-api.subsquare.io": "12KM5KYi2fBdRoijHVrpPx71buoU5bG8Yq7rVpEG7nrUG6f",
+    "polkadot-api.subsquare.io": polkadotAddress,
     "kusama-api.subsquare.io": "Cbds4QMUcQdwYceYMFuaCUxJaCPaSrJWRwP5s6qBpyq34Sg",
   };
   const genericAddress = "5C62Ck4UrFPiBtoCmeSrgF7x9yv9mn38446dhCpsi2mLHiFT";
@@ -850,11 +1093,45 @@ test("beneficiary activity normalizes SS58 addresses and validates requested pag
   });
 });
 
+test("beneficiary activity distinguishes an unindexed address from unavailable module data", async (t) => {
+  let moduleError;
+  const get = t.mock.method(request, "get", async (url) => {
+    if (url.pathname === `/treasury/beneficiaries/${polkadotAddress}`) {
+      throw new ApiRequestError("Beneficiary not found", { status: 404 });
+    }
+    assert.match(url.pathname, new RegExp(`^/beneficiaries/${polkadotAddress}/`));
+    if (moduleError) throw moduleError;
+    return emptyPage;
+  });
+  const client = await connect(t);
+  const args = { chain: "polkadot", address: polkadotAddress };
+  const all = await call(client, "get_address_treasury_benefits", args);
+  assert.deepEqual([all.isBeneficiary, all.summary], [false, null]);
+  assert.deepEqual(all.modules.map(({ module, supported, total, items }) => [module, supported, total, items]), [
+    ["treasury_spends", true, 0, []], ["treasury_proposals", true, 0, []],
+    ["tips", true, 0, []], ["bounties", true, 0, []], ["child_bounties", true, 0, []],
+  ]);
+  const onlyTips = { ...args, modules: ["tips", "tips"] };
+  const before = get.mock.callCount();
+  const deduplicated = await call(client, "get_address_treasury_benefits", onlyTips);
+  assert.deepEqual(deduplicated.modules, [all.modules.find(({ module }) => module === "tips")]);
+  assert.equal(get.mock.callCount() - before, 2);
+
+  moduleError = new ApiRequestError("Fixture tips endpoint unavailable", { status: 503 });
+  await expectToolError(client, "get_address_treasury_benefits", onlyTips, /Fixture tips endpoint unavailable/);
+});
+
 test("referendum details look up preimages only on request and share the standalone lookup", async (t) => {
   const hash = `0x${"a".repeat(64)}`;
   const uppercaseHash = `0x${"A".repeat(64)}`;
-  const referendum = { onchainData: { proposalHash: uppercaseHash } };
-  const preimage = { decoded: { calls: [{ method: "fixture" }] } };
+  let referendum = { onchainData: { proposalHash: uppercaseHash } };
+  let preimage = {
+    hash,
+    proposal: {
+      section: "utility", method: "batchAll",
+      args: [[{ section: "system", method: "remark", args: ["0x00"] }]],
+    },
+  };
   let preimageStatus = 200;
   const get = t.mock.method(request, "get", async (url) => {
     if (url.pathname === "/gov2/referendums/0") {
@@ -882,6 +1159,55 @@ test("referendum details look up preimages only on request and share the standal
   assert.equal((await call(client, "get_preimage", { chain, hash })).found, false);
   preimageStatus = 503;
   await expectToolError(client, "get_preimage", { chain, hash }, /Fixture preimage lookup failed/);
+
+  referendum = { onchainData: { proposal: { section: "system", method: "remark" } } };
+  const before = get.mock.callCount();
+  assert.deepEqual(await detail({ resolve_preimage: true }), { ...referendum, preimage: null });
+  await expectToolError(client, "get_preimage", { chain, hash: "0x12" }, /Input validation error.*hash/);
+  assert.equal(get.mock.callCount() - before, 1);
+  preimageStatus = 200;
+  preimage = [];
+  await expectToolError(client, "get_preimage", { chain, hash }, /\[invalid_upstream_response\].*preimage/);
+});
+
+test("preimages require a matching hash and a decoded call or stored bytes", async (t) => {
+  const hash = `0x${"a".repeat(64)}`;
+  let preimage;
+  t.mock.method(request, "get", async (url) => {
+    if (url.pathname === "/gov2/referendums/0") return { onchainData: { proposalHash: hash } };
+    assert.equal(url.pathname, `/preimages/${hash}`);
+    return preimage;
+  });
+  const client = await connect(t);
+  const args = { chain: "polkadot", hash };
+  const cases = [
+    [{}, /hash/],
+    [{ hash: `0x${"b".repeat(64)}`, hex: "0x0102" }, /hash/],
+    [{ hash }, /payload/],
+    [{ hash, proposal: {}, hex: "0x123" }, /payload/],
+  ];
+  for (const [response, reason] of cases) {
+    preimage = response;
+    await expectToolError(
+      client, "get_preimage", args,
+      new RegExp(`\\[invalid_upstream_response\\].*preimage.*${reason.source}`),
+    );
+  }
+  await expectToolError(
+    client, "opengov_referendum_detail", { chain: args.chain, referendum_index: 0, resolve_preimage: true },
+    /\[invalid_upstream_response\].*preimage.*payload/,
+  );
+
+  const stored = [
+    { hash: `0x${"A".repeat(64)}`, proposal: "0x0102", hex: "0x0102" },
+    { hash, data: "0x0102", isGov2: false },
+    { hash, call: { section: "system", method: "remark", args: [] }, isGov2: false },
+  ];
+  for (const response of stored) {
+    preimage = response;
+    const result = await call(client, "get_preimage", args);
+    assert.deepEqual([result.hash, result.found, result.preimage], [hash, true, response]);
+  }
 });
 
 test("track views fetch only their own upstream records and preserve the default summary", async (t) => {
@@ -935,6 +1261,53 @@ test("track views fetch only their own upstream records and preserve the default
     [referendumIndex, approvalPercent]), [[3, 66.6667]]);
 });
 
+test("track statistics join partial sources without inventing counts or turnout", async (t) => {
+  let tracks = [{ trackId: 4, trackName: "Delegation only" }];
+  t.mock.method(request, "get", async (url) => {
+    if (url.pathname === "/referenda/tracks") return tracks;
+    assert.equal(url.pathname, "/referenda/summary");
+    return {
+      trackTurnouts: [{ id: 2, name: "Turnout only", percentage: 0 }],
+      trackReferendaCounts: [{ id: 0, name: "Count only", count: 2, percent: 0.25 }],
+      delegation: { delegator: 0, delegatee: 0, capital: "0" },
+    };
+  });
+  const client = await connect(t);
+  const args = { chain: "hydration", view: "statistics" };
+  const stats = await call(client, "opengov_list_tracks", args);
+  assert.equal(stats.total, 3);
+  assert.deepEqual(stats.delegation, { delegator: 0, delegatee: 0, capital: "0" });
+  assert.deepEqual(stats.tracks.map(({ trackId, name, turnoutPercent, referendaCount, referendaPercent }) =>
+    [trackId, name, turnoutPercent, referendaCount, referendaPercent]), [
+    [0, "Count only", null, 2, 25], [2, "Turnout only", 0, null, null],
+    [4, "Delegation only", null, null, null],
+  ]);
+  tracks = {};
+  await expectToolError(client, "opengov_list_tracks", args, /\[invalid_upstream_response\].*track delegations/);
+});
+
+test("track turnout reports zero voting capital separately from undefined approval and empty tracks", async (t) => {
+  let turnout = [
+    { referendumIndex: 0, percentage: 0, ayes: "0", nays: "0" },
+    { referendumIndex: 1, percentage: 0.125, ayes: "0", nays: "90071992547409931" },
+  ];
+  t.mock.method(request, "get", async (url) => {
+    assert.equal(url.hostname, "kusama-api.subsquare.io");
+    if (url.pathname === "/referenda/tracks/65535/turnout") return [];
+    assert.equal(url.pathname, "/referenda/tracks/0/turnout");
+    return turnout;
+  });
+  const client = await connect(t);
+  const args = { chain: "kusama", track_id: 0 };
+  const result = await call(client, "opengov_get_track_turnout", args);
+  assert.deepEqual(result.items.map(({ referendumIndex, turnoutPercent, approvalPercent }) =>
+    [referendumIndex, turnoutPercent, approvalPercent]), [[0, 0, null], [1, 12.5, 0]]);
+  const empty = await call(client, "opengov_get_track_turnout", { ...args, track_id: 65535 });
+  assert.deepEqual([empty.total, empty.items], [0, []]);
+  turnout = { items: [] };
+  await expectToolError(client, "opengov_get_track_turnout", args, /\[invalid_upstream_response\].*track turnout/);
+});
+
 test("overview returns both track types even when their IDs overlap", async (t) => {
   t.mock.method(request, "get", async (url) => {
     const fellowship = {
@@ -954,16 +1327,33 @@ test("overview returns both track types even when their IDs overlap", async (t) 
     };
   });
   const client = await connect(t);
-  const { tracks, modules } = await call(client, "gov_overview", { chain: "collectives", recent: true });
+  const { scope, tracks, modules } = await call(client, "gov_overview", { chain: "collectives", recent: true });
+  assert.equal(scope, "recent");
   const fellowshipTrack = { referendumType: "fellowship", id: 1, name: "Rank 1", activeCount: 3 };
   assert.deepEqual(tracks, [fellowshipTrack]);
   assert.deepEqual(modules, [{ module: "fellowshipReferenda", active: 3, all: null }]);
 
   const kusama = await call(client, "gov_overview", { chain: "kusama" });
+  assert.equal(kusama.scope, "all");
   assert.deepEqual(kusama.tracks, [
     { referendumType: "opengov", id: 1, name: "Whitelisted Caller", activeCount: 5 },
     fellowshipTrack,
   ]);
+});
+
+test("overview preserves zero module counts and rejects malformed track collections", async (t) => {
+  let overview = { discussions: { active: 0, all: 0 }, metadata: { updatedAt: 123 } };
+  t.mock.method(request, "get", async () => overview);
+  const client = await connect(t);
+  const args = { chain: "hydration" };
+  const result = await call(client, "gov_overview", args);
+  assert.deepEqual(result.modules, [{ module: "discussions", active: 0, all: 0 }]);
+  assert.deepEqual(result.tracks, []);
+  overview = {};
+  const empty = await call(client, "gov_overview", args);
+  assert.deepEqual([empty.modules, empty.tracks], [[], []]);
+  overview = { gov2ReferendaTracks: {} };
+  await expectToolError(client, "gov_overview", args, /\[invalid_upstream_response\].*opengov tracks/);
 });
 
 test("governance event windows are inclusive and invalid timestamps fail before an upstream call", async (t) => {
@@ -981,10 +1371,37 @@ test("governance event windows are inclusive and invalid timestamps fail before 
   await expectToolError(
     client, "list_gov_events", { ...args, end_time: 8_640_000_000_000_001 }, /\[invalid_time\].*end_time/,
   );
+  await expectToolError(
+    client, "list_gov_events", { ...args, end_time: time - 1 }, /\[invalid_time_window\]/,
+  );
   assert.equal(get.mock.callCount(), 0);
   const events = await call(client, "list_gov_events", args);
   assert.deepEqual(events.items.map(({ blockTime }) => blockTime), [time]);
   assert.equal(events.truncated, false);
+});
+
+test("governance events count all matching records before truncating in chronological order", async (t) => {
+  const time = Date.parse("2025-11-01T00:00:00Z");
+  let response = [
+    ["OpenGov", "Referendum", "referenda_confirmed", time + 2],
+    ["Treasury", "Tip", "treasury_tip_closed", time],
+    ["OpenGov", "Fellowship", "fellowship_confirmed", time],
+    ["OpenGov", "Referendum", "referenda_submitted", time],
+    ["OpenGov", "Referendum", "referenda_confirmed", time + 1],
+  ].map(([category, subCategory, type, blockTime]) => ({ category, subCategory, type, indexer: { blockTime } }));
+  t.mock.method(request, "get", async () => response);
+  const client = await connect(t);
+  const args = {
+    chain: "polkadot", begin_time: time, end_time: time + 3,
+    category: "OpenGov", sub_category: "Referendum", type: "confirmed", limit: 1,
+  };
+  const result = await call(client, "list_gov_events", args);
+  assert.deepEqual([result.total, result.returned, result.truncated], [2, 1, true]);
+  assert.equal(result.items[0].blockTime, time + 1);
+  const empty = await call(client, "list_gov_events", { ...args, category: "Democracy" });
+  assert.deepEqual([empty.total, empty.returned, empty.truncated, empty.items], [0, 0, false, []]);
+  response = { items: [] };
+  await expectToolError(client, "list_gov_events", args, /\[invalid_upstream_response\].*events response/);
 });
 
 test("governance event details use the identifiers for each upstream event type", async (t) => {

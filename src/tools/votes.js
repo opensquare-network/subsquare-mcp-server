@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { chains } from "../config/chain.js";
 import { opengovChains, subsquareApiChains } from "../config/chains.js";
-import { listReferendumVotes } from "../services/referenda/votes.js";
+import { listReferendumVotes, voteStatsSchema } from "../services/referenda/votes.js";
 import {
   createStructuredJsonResult,
   paginatedItemsSchema,
@@ -30,22 +30,6 @@ const voteSummarySchema = z.object({
   convictionCounts: z
     .record(z.string(), z.number().int().nonnegative())
     .describe("Counts per conviction across all vote records, including delegations and split votes"),
-});
-
-const voteStatsSchema = z.object({
-  support: z.string().nullable(),
-  electorate: z.string().nullable(),
-  votes: z.string().nullable(),
-  ayes: z.string().nullable(),
-  nays: z.string().nullable(),
-  totalCapital: z.string().nullable(),
-  turnoutRatio: z.number().nullable(),
-  turnoutPercent: z.number().nullable(),
-  directCapital: z.string().nullable(),
-  directAddresses: z.number().nullable(),
-  delegationCapital: z.string().nullable(),
-  delegationVotes: z.string().nullable(),
-  delegationAddresses: z.number().nullable(),
 });
 
 const tallyItemSchema = z.object({
@@ -79,6 +63,9 @@ const votesOutputSchema = paginatedItemsSchema.extend({
       display: z.string().optional(),
     }),
   ),
+  identityStatus: z
+    .enum(["available", "unavailable", "not_applicable"])
+    .describe("Whether the identity lookup succeeded, failed, or was not needed because the page had no addresses to resolve"),
   source: z.string(),
 });
 
@@ -87,7 +74,7 @@ export function registerReferendumVoteTools(server) {
     "list_referendum_votes",
     {
       description:
-        "List votes on one OpenGov or Fellowship referendum, sorted by voting power, with referendum-wide counts, balances, and conviction distribution. OpenGov statistics include turnout based on voting capital, not conviction-weighted votes; set include_stats=false to skip that lookup. Optionally include tally history. OpenGov amounts use chain base units.",
+        "List votes on one OpenGov or Fellowship referendum, sorted by voting power, with referendum-wide counts, balances, and conviction distribution. Identity lookup failures do not hide votes or statistics; see identityStatus. OpenGov statistics include turnout based on voting capital, not conviction-weighted votes; set include_stats=false to skip that lookup. Optionally include tally history. OpenGov amounts use chain base units.",
       inputSchema: z.object({
         chain: z
           .enum(subsquareApiChains)

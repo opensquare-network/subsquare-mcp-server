@@ -65,3 +65,8 @@ Debug with the MCP Inspector:
 ```bash
 npx --yes @modelcontextprotocol/inspector@latest
 ```
+
+### Tests
+
+Run `pnpm test` for the offline MCP contract suite. It calls the tools through an
+in-memory MCP client with fixture responses; no live API or identity endpoint is needed.

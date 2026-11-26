@@ -8,7 +8,7 @@ export function registerPreimageTools(server) {
     "get_preimage",
     {
       description:
-        "Get a decoded preimage by its 0x-prefixed hash, including the nested decoded calls of batched proposals. Use it to see what a whitelisted-caller referendum or a proposal hash actually executes. Returns found=false when Subsquare has no stored preimage for the hash.",
+        "Get a stored preimage by its 0x-prefixed hash, with the decoded call (including nested batch calls) when available, or raw bytes. Returns found=false when SubSquare reports that the hash is not indexed. Malformed records are reported as errors.",
       inputSchema: z.object({
         chain: z
           .enum(subsquareApiChains)
