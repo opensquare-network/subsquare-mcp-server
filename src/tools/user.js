@@ -95,7 +95,10 @@ export function registerUserTools(server) {
       outputSchema: permissiveOutputSchema,
       annotations: readOnlyAnnotations,
     },
-    async (args) => createStructuredJsonResult(await getUserVoteStats(args)),
+    async ({ chain, address, modules }) =>
+      withUserErrorResult({ chain, address }, () =>
+        getUserVoteStats({ chain, address, modules }),
+      ),
   );
 
   server.registerTool(

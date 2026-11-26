@@ -4,6 +4,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "../src/mcp.js";
 import { ApiRequestError, request } from "../src/services/api.js";
+import { listMultiAssetChildBounties } from "../src/services/treasury/bounties.js";
 
 const address = "fixture-address";
 const emptyPage = { page: 1, pageSize: 25, total: 0, items: [] };
@@ -190,6 +191,46 @@ test("standalone referenda summary skips a failing list and shares the summary c
   );
 });
 
+test("referendum comments reject legacy pagination and Polkassembly options", async (t) => {
+  const commentsPath = "/gov2/referendums/fixture-referendum/comments";
+  const get = t.mock.method(request, "get", async (url, query) => {
+    switch (url.pathname) {
+      case "/gov2/referendums/7":
+        return { _id: "fixture-referendum", polkassemblyId: 7, polkassemblyPostType: "referendum" };
+      case commentsPath:
+        return { ...emptyPage, pageSize: query.page_size, total: 1, items: [{ _id: "comment" }] };
+      case "/polkassembly-comments":
+        return [{ id: "polkassembly-comment" }];
+      case "/polkassembly-comments/referendum/7/replies":
+        return {};
+      default:
+        assert.fail(`Unexpected comment endpoint: ${url.pathname}`);
+    }
+  });
+  const client = await connect(t);
+  const args = { chain: "polkadot", referendum_type: "opengov", referendum_index: 7 };
+
+  await expectToolError(
+    client,
+    "list_referendum_comments",
+    { ...args, pageSize: 1, includePolkassembly: false },
+    /Input validation error[\s\S]*pageSize[\s\S]*includePolkassembly/,
+  );
+  assert.equal(get.mock.callCount(), 0);
+
+  const result = await call(client, "list_referendum_comments", {
+    ...args,
+    page_size: 1,
+    include_polkassembly: false,
+  });
+  assert.equal(result.pageSize, 1);
+  assert.deepEqual(result.items.map(({ comment_source }) => comment_source), ["subsquare"]);
+  assert.deepEqual(
+    get.mock.calls.map(({ arguments: [url] }) => url.pathname),
+    ["/gov2/referendums/7", commentsPath],
+  );
+});
+
 test("standalone user vote stats do not load profile or counts", async (t) => {
   const statsPath = `/users/${address}/referenda/vote-stats`;
   const source = `https://polkadot-api.subsquare.io${statsPath}`;
@@ -200,7 +241,7 @@ test("standalone user vote stats do not load profile or counts", async (t) => {
       throw new ApiRequestError("Fixture user profile or counts unavailable", { status: 503 });
     }
     if (statsUnavailable) {
-      throw new ApiRequestError("Fixture vote stats unavailable", { status: 503 });
+      throw new ApiRequestError("Fixture vote stats rate limited", { status: 429 });
     }
     return stats;
   });
@@ -216,7 +257,20 @@ test("standalone user vote stats do not load profile or counts", async (t) => {
     data: { voteStats: { referenda: { supported: true, source, data: stats } } },
   });
   statsUnavailable = true;
-  await expectToolError(client, "get_user_vote_stats", args, /Fixture vote stats unavailable/);
+  assert.deepEqual(await call(client, "get_user_vote_stats", args), {
+    chain: "polkadot",
+    address,
+    source: [source],
+    pagination: null,
+    data: null,
+    error: {
+      code: "request_failed",
+      reason: null,
+      message: "Fixture vote stats rate limited",
+      status: 429,
+      endpoint: source,
+    },
+  });
   assert.deepEqual(get.mock.calls.map((entry) => entry.arguments[0].toString()), [source, source]);
 });
 
@@ -322,6 +376,54 @@ test("paginated Treasury, bounty, and Fellowship modes reject incomplete upstrea
     const expected = name === "treasury_get" ? { ...emptyPage, totalBurnt: "0" } : emptyPage;
     assert.deepEqual(JSON.parse(JSON.stringify(result)), expected);
   }
+});
+
+test("multi-asset child bounty lookups by ids require an array rather than a page", async (t) => {
+  const ids = "1_2_3";
+  const item = { parentBountyId: 1, childBountyId: 2 };
+  let response = [item];
+  const get = t.mock.method(request, "get", async (url) => {
+    assert.equal(url.pathname, "/treasury/multi-asset-child-bounties");
+    return response;
+  });
+
+  assert.deepEqual(await listMultiAssetChildBounties({ ids }), [item]);
+  assert.equal(get.mock.calls[0].arguments[1].ids, ids);
+  response = [];
+  assert.deepEqual(await listMultiAssetChildBounties({ ids }), []);
+  await assert.rejects(
+    listMultiAssetChildBounties(),
+    /\[invalid_upstream_response\].*pagination/,
+  );
+
+  response = emptyPage;
+  assert.deepEqual(await listMultiAssetChildBounties({ ids: "" }), emptyPage);
+  await assert.rejects(
+    listMultiAssetChildBounties({ ids }),
+    /\[invalid_upstream_response\].*ids.*array/,
+  );
+});
+
+test("Coretime sale lists reject invalid items and totals but accept empty pages", async (t) => {
+  let sales = { total: 3, items: null };
+  t.mock.method(request, "post", async (_url, { variables }) => {
+    assert.deepEqual(variables, { limit: 5, offset: 10 });
+    return { data: { coretimeHistorySales: sales } };
+  });
+  const client = await connect(t);
+  const args = { chain: "polkadot", limit: 5, offset: 10 };
+
+  await expectToolError(client, "list_coretime_sales", args, /Output validation error[\s\S]*items/);
+  sales = { total: -1, items: [] };
+  await expectToolError(client, "list_coretime_sales", args, /Output validation error[\s\S]*total/);
+
+  sales = { total: 3, items: [] };
+  assert.deepEqual(await call(client, "list_coretime_sales", args), {
+    ...args,
+    symbol: "DOT",
+    decimals: 10,
+    ...sales,
+  });
 });
 
 test("account assets and activity use their own pagination parameters", async (t) => {

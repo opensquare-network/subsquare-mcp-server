@@ -87,6 +87,15 @@ export async function listMultiAssetChildBounties({
       simple: true,
     },
   );
+  // The upstream uses the unpaginated endpoint behavior for non-empty serialized ids.
+  if (String(query.ids ?? "") !== "") {
+    if (!Array.isArray(response)) {
+      throw new Error(
+        "[invalid_upstream_response] SubSquare Multi-Asset Child Bounties ids query must return an array",
+      );
+    }
+    return response;
+  }
   return requirePaginatedResponse(response, "SubSquare Multi-Asset Child Bounties");
 }
 

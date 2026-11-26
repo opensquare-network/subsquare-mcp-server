@@ -4,8 +4,9 @@ import { getCoretimeSale, listCoretimeSales } from "../services/coretime.js";
 import {
   createStructuredJsonResult,
   pageSize,
-  readOnlyAnnotations,
+  paginatedItemsSchema,
   permissiveOutputSchema,
+  readOnlyAnnotations,
 } from "./common.js";
 
 const chain = z.enum(coretimeChains).describe("Coretime market chain");
@@ -65,7 +66,7 @@ export function registerCoretimeTools(server) {
     {
       description: "List Coretime sale cycles to locate a saleId.",
       inputSchema: { chain, limit: limit.default(10), offset },
-      outputSchema: permissiveOutputSchema,
+      outputSchema: paginatedItemsSchema.pick({ items: true, total: true }).passthrough(),
       annotations: readOnlyAnnotations,
     },
     async (args) => createStructuredJsonResult(await listCoretimeSales(args)),

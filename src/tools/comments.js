@@ -68,7 +68,7 @@ export function registerCommentTools(server) {
     {
       description:
         "List comments on a referendum, optionally merged with Polkassembly comments. Supports OpenGov, Fellowship, and Ambassador referenda through `referendum_type`; the chain must be one that type supports. Each item carries id, content, author, timestamps, nested replies, reactions, and comment_source.",
-      inputSchema: commentsInputSchema,
+      inputSchema: z.object(commentsInputSchema).strict(),
       outputSchema: {
         network: z.string(),
         referendumType: z.string(),
